@@ -53,7 +53,7 @@ pub trait AbsorbFallback<F> {
 /// in DDML and domain specific.
 ///
 /// Note, that "absolute" links are absorbed in the message header.
-pub trait AbsorbExternalFallback<F> {
+pub trait AbsorbExternalFallback<F>: Send + Sync {
     fn sizeof_absorb_external(&self, ctx: &mut sizeof::Context<F>) -> Result<()>;
     fn wrap_absorb_external<OS: io::OStream>(&self, ctx: &mut wrap::Context<F, OS>) -> Result<()>;
     fn unwrap_absorb_external<IS: io::IStream>(&self, ctx: &mut unwrap::Context<F, IS>) -> Result<()>;

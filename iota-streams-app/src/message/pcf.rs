@@ -1,4 +1,8 @@
-use iota_streams_core::Result;
+use iota_streams_core::{
+    async_trait,
+    prelude::Box,
+    Result,
+};
 
 use iota_streams_core::{
     sponge::prp::PRP,
@@ -111,47 +115,52 @@ impl<Content> PCF<Content> {
     }
 }
 
+#[async_trait]
 impl<F, Content> ContentSizeof<F> for PCF<Content>
 where
     F: PRP,
-    Content: ContentSizeof<F>,
+    Content: ContentSizeof<F> + Send + Sync,
 {
-    fn sizeof<'c>(&self, mut ctx: &'c mut sizeof::Context<F>) -> Result<&'c mut sizeof::Context<F>> {
+    async fn sizeof<'c>(&self, mut ctx: &'c mut sizeof::Context<F>) -> Result<&'c mut sizeof::Context<F>> {
         ctx.absorb(&self.frame_type)?.skip(&self.payload_frame_num)?;
-        self.content.sizeof(&mut ctx)?;
+        self.content.sizeof(&mut ctx).await?;
         Ok(ctx)
     }
 }
 
+#[async_trait]
 impl<F, Content, Store> ContentWrap<F, Store> for PCF<Content>
 where
     F: PRP,
-    Content: ContentWrap<F, Store>,
+    Content: ContentWrap<F, Store> + Send + Sync,
+    Store: Send + Sync
 {
-    fn wrap<'c, OS: io::OStream>(
+    async fn wrap<'c, OS: io::OStream>(
         &self,
         store: &Store,
         mut ctx: &'c mut wrap::Context<F, OS>,
     ) -> Result<&'c mut wrap::Context<F, OS>> {
         ctx.absorb(&self.frame_type)?.skip(&self.payload_frame_num)?;
-        self.content.wrap(store, &mut ctx)?;
+        self.content.wrap(store, &mut ctx).await?;
         Ok(ctx)
     }
 }
 
+#[async_trait]
 impl<F, Content, Store> ContentUnwrap<F, Store> for PCF<Content>
 where
     F: PRP,
     Content: ContentUnwrap<F, Store>,
+    Store: Send + Sync,
 {
-    fn unwrap<'c, IS: io::IStream>(
+    async fn unwrap<'c, IS: io::IStream>(
         &mut self,
         store: &Store,
         mut ctx: &'c mut unwrap::Context<F, IS>,
     ) -> Result<&'c mut unwrap::Context<F, IS>> {
         ctx.absorb(&mut self.frame_type)?.skip(&mut self.payload_frame_num)?;
         payload_frame_num_check(&self.payload_frame_num)?;
-        self.content.unwrap(store, &mut ctx)?;
+        self.content.unwrap(store, &mut ctx).await?;
         Ok(ctx)
     }
 }

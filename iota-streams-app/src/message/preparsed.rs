@@ -21,7 +21,7 @@ impl<'a, F, Link: Default + Clone> PreparsedMessage<'a, F, Link> {
         self.header.get_content_type()
     }
 
-    pub fn unwrap<Store, Content>(
+    pub async fn unwrap<Store, Content>(
         mut self,
         store: &Store,
         content: Content,
@@ -29,9 +29,10 @@ impl<'a, F, Link: Default + Clone> PreparsedMessage<'a, F, Link> {
     where
         Content: ContentUnwrap<F, Store>,
         F: PRP,
+        Store: Send + Sync,
     {
         let mut pcf = pcf::PCF::default_with_content(content);
-        pcf.unwrap(store, &mut self.ctx)?;
+        pcf.unwrap(store, &mut self.ctx).await?;
         // Discard what's left of `self.ctx.stream`
         Ok(UnwrappedMessage {
             link: self.header.link,

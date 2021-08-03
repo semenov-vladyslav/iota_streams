@@ -14,7 +14,7 @@ default = ["std", "tangle", "sync-client"]
 std = ["iota-streams-core/std", "iota-streams-core-edsig/std", "iota-streams-ddml/std", "chrono/std", "chrono/clock", "hex/std"]
 # rust doesn't support async traits, `async-trait` crate emulates `async` keyword
 # `async` implies `std` for now
-async = ["async-trait", "atomic_refcell"]
+async = ["atomic_refcell"]
 tangle = ["chrono"]
 # `iota-client` support is implemented as a feature (as opposed to a separate crate) in order to
 # implement Transport for iota_client::Client.
@@ -37,7 +37,6 @@ wasm-timer = { version = "0.2.5", optional = true }
 js-sys = { version = "0.3.46", optional = true }
 chrono = { version = "0.4.11", default-features = false, optional = true }
 hex = { version = "0.4", default-features = false, optional = false }
-async-trait = { version = "0.1", optional = true }
 atomic_refcell = { version = "0.1.6", optional = true }
 
 # Dependencies for "client" feature

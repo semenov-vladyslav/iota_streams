@@ -1,5 +1,9 @@
 use core::fmt;
-use iota_streams_core::Result;
+use iota_streams_core::{
+    async_trait,
+    prelude::Box,
+    Result
+};
 
 use iota_streams_core::{
     sponge::prp::PRP,
@@ -176,12 +180,13 @@ where
     }
 }
 
+#[async_trait]
 impl<F, Link> ContentSizeof<F> for HDF<Link>
 where
     F: PRP,
     Link: AbsorbExternalFallback<F>,
 {
-    fn sizeof<'c>(&self, ctx: &'c mut sizeof::Context<F>) -> Result<&'c mut sizeof::Context<F>> {
+    async fn sizeof<'c>(&self, ctx: &'c mut sizeof::Context<F>) -> Result<&'c mut sizeof::Context<F>> {
         let content_type_and_payload_length = NBytes::<U2>::default();
         let payload_frame_count = NBytes::<U3>::default();
         ctx.absorb(self.encoding)?
@@ -194,18 +199,20 @@ where
             .absorb(&self.previous_msg_link)?
             .skip(self.seq_num)?;
 
-        self.sender_id.sizeof(ctx)?;
+        self.sender_id.sizeof(ctx).await?;
 
         Ok(ctx)
     }
 }
 
+#[async_trait]
 impl<F, Link, Store> ContentWrap<F, Store> for HDF<Link>
 where
     F: PRP,
-    Link: AbsorbExternalFallback<F> + std::fmt::Debug,
+    Link: AbsorbExternalFallback<F>,
+    Store: Send + Sync,
 {
-    fn wrap<'c, OS: io::OStream>(
+    async fn wrap<'c, OS: io::OStream>(
         &self,
         _store: &Store,
         ctx: &'c mut wrap::Context<F, OS>,
@@ -237,18 +244,20 @@ where
             .absorb(&self.previous_msg_link)?
             .skip(self.seq_num)?;
 
-        self.sender_id.wrap(_store, ctx)?;
+        self.sender_id.wrap(_store, ctx).await?;
 
         Ok(ctx)
     }
 }
 
+#[async_trait]
 impl<F, Link, Store> ContentUnwrap<F, Store> for HDF<Link>
 where
     F: PRP,
     Link: AbsorbExternalFallback<F> + std::fmt::Debug + Clone,
+    Store: Send + Sync,
 {
-    fn unwrap<'c, IS: io::IStream>(
+    async fn unwrap<'c, IS: io::IStream>(
         &mut self,
         _store: &Store,
         ctx: &'c mut unwrap::Context<F, IS>,
@@ -288,7 +297,7 @@ where
             .absorb(&mut self.previous_msg_link)?
             .skip(&mut self.seq_num)?;
 
-        let (id, ctx) = Identifier::unwrap_new(_store, ctx)?;
+        let (id, ctx) = Identifier::unwrap_new(_store, ctx).await?;
         self.sender_id = id;
 
         Ok(ctx)

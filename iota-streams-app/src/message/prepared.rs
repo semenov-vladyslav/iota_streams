@@ -43,17 +43,17 @@ impl<'a, F, Link: Default, Store: 'a, Content> PreparedMessage<'a, F, Link, Stor
 impl<'a, F, Link, Store, Content> PreparedMessage<'a, F, Link, Store, Content>
 where
     F: PRP,
-    Link: HasLink + AbsorbExternalFallback<F> + Clone + Default,
+    Link: HasLink + AbsorbExternalFallback<F> + Clone + Default + Send + Sync,
     <Link as HasLink>::Rel: Eq + SkipFallback<F>,
-    Store: 'a + LinkStore<F, <Link as HasLink>::Rel>,
+    Store: 'a + LinkStore<F, <Link as HasLink>::Rel> + Send + Sync,
     HDF<Link>: ContentWrap<F, Store>,
-    Content: ContentWrap<F, Store>,
+    Content: ContentWrap<F, Store> + Send + Sync,
 {
-    pub fn wrap(&self) -> Result<WrappedMessage<F, Link>> {
+    pub async fn wrap(&self) -> Result<WrappedMessage<F, Link>> {
         let buf_size = {
             let mut ctx = sizeof::Context::<F>::new();
-            self.header.sizeof(&mut ctx)?;
-            self.content.sizeof(&mut ctx)?;
+            self.header.sizeof(&mut ctx).await?;
+            self.content.sizeof(&mut ctx).await?;
             ctx.get_size()
         };
 
@@ -61,8 +61,8 @@ where
 
         let spongos = {
             let mut ctx = wrap::Context::new(&mut buf[..]);
-            self.header.wrap(&*self.store, &mut ctx)?;
-            self.content.wrap(&*self.store, &mut ctx)?;
+            self.header.wrap(&*self.store, &mut ctx).await?;
+            self.content.wrap(&*self.store, &mut ctx).await?;
             try_or!(ctx.stream.is_empty(), OutputStreamNotFullyConsumed(ctx.stream.len()))?;
             ctx.spongos
         };

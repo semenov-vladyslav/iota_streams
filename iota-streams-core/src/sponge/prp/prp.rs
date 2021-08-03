@@ -7,7 +7,7 @@ use crate::prelude::generic_array::{
 ///
 /// Actually, it may be non-bijective as the inverse transform is not used in sponge construction.
 #[allow(clippy::upper_case_acronyms)]
-pub trait PRP: Sized + Default + Clone //+ From<Vec<u8>> + Into<Vec<u8>>
+pub trait PRP: Sized + Default + Clone + Send + Sync //+ From<Vec<u8>> + Into<Vec<u8>>
 {
     /// Size of the outer state in bytes.
     /// In other words, size of data chunk that PRP can process in one transform.
