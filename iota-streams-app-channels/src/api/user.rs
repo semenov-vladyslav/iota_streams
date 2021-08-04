@@ -131,7 +131,7 @@ pub struct User<F, Link, LG, LS, Keys>
 where
     F: PRP,
     Link: HasLink,
-    LS: Send
+    LS: Send + Sync,
 {
     // PRNG object used for Ed25519, X25519, Spongos key generation, etc.
     // pub(crate) prng: prng::Prng<F>,
@@ -305,7 +305,7 @@ where
             .with_seq_num(ANN_MESSAGE_NUM)
             .with_identifier(&self.sig_kp.public.into());
         let content = announce::ContentWrap::new(&self.sig_kp, self.flags);
-        Ok(PreparedMessage::new(self.link_store.lock().unwrap().borrow(), header, content))
+        Ok(PreparedMessage::new(&self.link_store, header, content))
     }
 
     /// Create Announcement message.
@@ -392,7 +392,7 @@ where
                     author_ke_pk,
                     _phantom: core::marker::PhantomData,
                 };
-                Ok(PreparedMessage::new(self.link_store.lock().unwrap().borrow(), header, content))
+                Ok(PreparedMessage::new(&self.link_store, header, content))
             } else {
                 err!(AuthorExchangeKeyNotFound)
             }
@@ -457,7 +457,7 @@ where
             sig_kp: &self.sig_kp,
             _phantom: core::marker::PhantomData,
         };
-        Ok(PreparedMessage::new(self.link_store.lock().unwrap().borrow(), header, content))
+        Ok(PreparedMessage::new(&self.link_store, header, content))
     }
 
     pub fn prepare_keyload<'a>(
@@ -646,7 +646,7 @@ where
                     sig_kp: &self.sig_kp,
                     _phantom: core::marker::PhantomData,
                 };
-                Ok(PreparedMessage::new(self.link_store.lock().unwrap().borrow(), header, content))
+                Ok(PreparedMessage::new(&self.link_store, header, content))
             }
             None => err!(SeqNumRetrievalFailure),
         }
@@ -717,7 +717,7 @@ where
                     masked_payload,
                     _phantom: core::marker::PhantomData,
                 };
-                Ok(PreparedMessage::new(self.link_store.lock().unwrap().borrow(), header, content))
+                Ok(PreparedMessage::new(&self.link_store, header, content))
             }
             None => err!(SeqNumRetrievalFailure),
         }
@@ -798,7 +798,7 @@ where
             ref_link,
         };
 
-        Ok(PreparedMessage::new(self.link_store.lock().unwrap().borrow(), header, content))
+        Ok(PreparedMessage::new(&self.link_store, header, content))
     }
 
     pub async fn wrap_sequence(&mut self, ref_link: &<Link as HasLink>::Rel) -> Result<WrappedSequence<F, Link>> {
@@ -826,8 +826,7 @@ where
                     };
 
                     let wrapped = {
-                        let link_store = self.link_store.lock().unwrap();
-                        let prepared = PreparedMessage::new(link_store.borrow(), header, content);
+                        let prepared = PreparedMessage::new(&self.link_store, header, content);
                         prepared.wrap().await?
                     };
 
@@ -1035,7 +1034,7 @@ where
     <Link as HasLink>::Rel: Eq + fmt::Debug + SkipFallback<F> + AbsorbFallback<F>,
     LG: LinkGenerator<Link>,
     LS: LinkStore<F, <Link as HasLink>::Rel> + Default,
-    <LS as LinkStore<F, <Link as HasLink>::Rel>>::Info: AbsorbFallback<F>,
+    <LS as LinkStore<F, <Link as HasLink>::Rel>>::Info: AbsorbFallback<F> + Send + Sync,
     Keys: KeyStore<Cursor<<Link as HasLink>::Rel>, F>,
 {
     async fn sizeof<'c>(&self, ctx: &'c mut sizeof::Context<F>) -> Result<&'c mut sizeof::Context<F>> {
@@ -1061,38 +1060,24 @@ where
         let repeated_links = Size(links.len());
         let keys = self.key_store.iter();
         let repeated_keys = Size(keys.len());
-        ctx.absorb(repeated_links)?;
-        for (link, (s, info)) in links.into_iter() {
-            ctx.absorb(<&Fallback<<Link as HasLink>::Rel>>::from(link))?
-                .mask(<&NBytes<F::CapacitySize>>::from(s.arr()))?
-                .absorb(<&Fallback<<LS as LinkStore<F, <Link as HasLink>::Rel>>::Info>>::from(
-                    info,
-                ))?;
-        }
-        /*    .repeated(links.into_iter(), |ctx, (link, (s, info))| {
+        ctx.absorb(repeated_links)?
+            .repeated(links.into_iter(), |ctx, (link, (s, info))| async {
                 ctx.absorb(<&Fallback<<Link as HasLink>::Rel>>::from(link))?
                     .mask(<&NBytes<F::CapacitySize>>::from(s.arr()))?
                     .absorb(<&Fallback<<LS as LinkStore<F, <Link as HasLink>::Rel>>::Info>>::from(
                         info,
                     ))?;
                 Ok(ctx)
-            })?*/
-            ctx.absorb(repeated_keys)?;
-        for (id, cursor) in keys.into_iter() {
-            let ctx = id.wrap(_store, ctx).await?;
-            ctx.absorb(<&Fallback<<Link as HasLink>::Rel>>::from(&cursor.link))?
-                .absorb(Uint32(cursor.branch_no))?
-                .absorb(Uint32(cursor.seq_no))?;
-        }
-
-            /*.repeated(keys.into_iter(), |ctx, (id, cursor)| {
-                let ctx = id.sizeof(ctx)?;
+            }).await?
+            .absorb(repeated_keys)?
+            .repeated(keys.into_iter(), |ctx, (id, cursor)| async {
+                let ctx = id.sizeof(ctx).await?;
                 ctx.absorb(<&Fallback<<Link as HasLink>::Rel>>::from(&cursor.link))?
                     .absorb(Uint32(cursor.branch_no))?
                     .absorb(Uint32(cursor.seq_no))?;
                 Ok(ctx)
-            })?*/
-            ctx.commit()?
+            }).await?
+            .commit()?
             .squeeze(Mac(32))?;
         Ok(ctx)
     }
@@ -1107,9 +1092,9 @@ where
     <Link as HasLink>::Rel: Eq + fmt::Debug + SkipFallback<F> + AbsorbFallback<F>,
     Store: LinkStore<F, <Link as HasLink>::Rel>,
     LG: LinkGenerator<Link>,
-    LS: LinkStore<F, <Link as HasLink>::Rel> + Default + Send + Sync,
-    <LS as LinkStore<F, <Link as HasLink>::Rel>>::Info: AbsorbFallback<F>,
-    Keys: KeyStore<Cursor<<Link as HasLink>::Rel>, F> + Send + Sync,
+    LS: LinkStore<F, <Link as HasLink>::Rel> + Default,
+    <LS as LinkStore<F, <Link as HasLink>::Rel>>::Info: AbsorbFallback<F> + Send + Sync,
+    Keys: KeyStore<Cursor<<Link as HasLink>::Rel>, F> + Send,
 {
     async fn wrap<'c, OS: io::OStream + Send + Sync>(
         &self,
@@ -1133,48 +1118,55 @@ where
             ctx.absorb(author_sig_pk)?;
         }
 
-        let link_store = self.link_store.lock().unwrap().borrow();
+        let link_store = self.link_store.as_ref().lock().unwrap().borrow();
         let links = link_store.iter();
         let repeated_links = Size(links.len());
         let keys = self.key_store.iter();
         let repeated_keys = Size(keys.len());
-        ctx.absorb(repeated_links)?;
-        for i in 0..repeated_links.0 {
-            let (link, (s, info)) = links[i];
-            ctx.absorb(<&Fallback<<Link as HasLink>::Rel>>::from(link))?
-                .mask(<&NBytes<F::CapacitySize>>::from(s.arr()))?
-                .absorb(<&Fallback<<LS as LinkStore<F, <Link as HasLink>::Rel>>::Info>>::from(
-                    info,
-                ))?;
-        }
-            /*.repeated(links.into_iter(), |ctx, (link, (s, info))| async {
+        ctx.absorb(repeated_links)?
+            .repeated(links.into_iter(), |ctx, (link, (s, info))| async {
                 ctx.absorb(<&Fallback<<Link as HasLink>::Rel>>::from(link))?
                     .mask(<&NBytes<F::CapacitySize>>::from(s.arr()))?
                     .absorb(<&Fallback<<LS as LinkStore<F, <Link as HasLink>::Rel>>::Info>>::from(
                         info,
                     ))?;
                 Ok(ctx)
-            }).await?*/
-            ctx.absorb(repeated_keys)?;
-        for i in 0..repeated_keys.0 {
-            let (id, cursor) = keys[i];
-            ctx = id.wrap(_store, ctx).await?;
-            ctx.absorb(<&Fallback<<Link as HasLink>::Rel>>::from(&cursor.link))?
-                .absorb(Uint32(cursor.branch_no))?
-                .absorb(Uint32(cursor.seq_no))?;
-        }
-
-            /*.repeated(keys.into_iter(), |ctx, (id, cursor)| {
-                let ctx = id.wrap(_store, ctx)?;
-                ctx.absorb(<&Fallback<<Link as HasLink>::Rel>>::from(&cursor.link))?
+            }).await?
+            .absorb(repeated_keys)?
+            .repeated(keys.into_iter(), |ctx, (id, cursor)| async {
+                let ctx = id.clone().wrap(_store.borrow(), ctx.borrow_mut()).await?;
+                ctx.absorb(<&Fallback<<Link as HasLink>::Rel>>::from(&cursor.borrow().link))?
                     .absorb(Uint32(cursor.branch_no))?
                     .absorb(Uint32(cursor.seq_no))?;
                 Ok(ctx)
-            })?*/
-            ctx.commit()?
+            }).await?
+            .commit()?
             .squeeze(Mac(32))?;
         Ok(ctx)
     }
+}
+
+
+async fn unwrap_repeat_keys<'a, F, Link, Keys, Store, IS: io::IStream + Send + Sync>(
+    ctx: &'a mut unwrap::Context<F, IS>,
+    store: &Store,
+    key_store: &'a mut Keys
+) -> Result<()>
+    where
+        F: PRP,
+        Link: HasLink + AbsorbExternalFallback<F> + AbsorbFallback<F>,
+        <Link as HasLink>::Base: Eq + fmt::Debug + fmt::Display,
+        <Link as HasLink>::Rel: Eq + fmt::Debug + SkipFallback<F> + AbsorbFallback<F>,
+        Store: LinkStore<F, <Link as HasLink>::Rel> + Send + Sync,
+        Keys: KeyStore<Cursor<<Link as HasLink>::Rel>, F> + Default,
+{
+    let mut link = Fallback(<Link as HasLink>::Rel::default());
+    let mut branch_no = Uint32(0);
+    let mut seq_no = Uint32(0);
+    let (id, ctx) = Identifier::unwrap_new(store, ctx).await?;
+    ctx.absorb(&mut link)?.absorb(&mut branch_no)?.absorb(&mut seq_no)?;
+    key_store.insert_cursor(id, Cursor::new_at(link.0, branch_no.0, seq_no.0))?;
+    Ok(())
 }
 
 #[async_trait]
@@ -1186,13 +1178,13 @@ where
     <Link as HasLink>::Rel: Eq + fmt::Debug + SkipFallback<F> + AbsorbFallback<F>,
     Store: LinkStore<F, <Link as HasLink>::Rel> + Send + Sync,
     LG: LinkGenerator<Link>,
-    LS: LinkStore<F, <Link as HasLink>::Rel> + Default,
-    <LS as LinkStore<F, <Link as HasLink>::Rel>>::Info: Default + AbsorbFallback<F>,
+    LS: LinkStore<F, <Link as HasLink>::Rel> + Default + Send + Sync,
+    <LS as LinkStore<F, <Link as HasLink>::Rel>>::Info: Default + AbsorbFallback<F> + Send + Sync,
     Keys: KeyStore<Cursor<<Link as HasLink>::Rel>, F> + Default,
 {
     async fn unwrap<'c, IS: io::IStream + Send + Sync>(
-        &mut self,
-        _store: &Store,
+        &'c mut self,
+        _store: &'c Store,
         ctx: &'c mut unwrap::Context<F, IS>,
     ) -> Result<&'c mut unwrap::Context<F, IS>> {
         let mut sig_sk_bytes = NBytes::<U32>::default();
@@ -1234,48 +1226,28 @@ where
 
         let mut repeated_links = Size(0);
         let mut link_store = LS::default();
-        ctx.absorb(&mut repeated_links)?;
-        for _ in 0..repeated_links.0 {
-            let mut link = Fallback(<Link as HasLink>::Rel::default());
-            let mut s = NBytes::<F::CapacitySize>::default();
-            let mut info = Fallback(<LS as LinkStore<F, <Link as HasLink>::Rel>>::Info::default());
-            ctx.absorb(&mut link)?.mask(&mut s)?.absorb(&mut info)?;
-            let a: GenericArray<u8, F::CapacitySize> = s.into();
-            link_store.insert(&link.0, Inner::<F>::from(a), info.0)?;
-        }
-            /*
-        .repeated(repeated_links, |ctx| async {
-            let mut link = Fallback(<Link as HasLink>::Rel::default());
-            let mut s = NBytes::<F::CapacitySize>::default();
-            let mut info = Fallback(<LS as LinkStore<F, <Link as HasLink>::Rel>>::Info::default());
-            ctx.absorb(&mut link)?.mask(&mut s)?.absorb(&mut info)?;
-            let a: GenericArray<u8, F::CapacitySize> = s.into();
-            link_store.insert(&link.0, Inner::<F>::from(a), info.0)?;
-            Ok(ctx)
-        }).await?;*/
+        ctx.absorb(&mut repeated_links)?
+            .repeated(repeated_links, |ctx| async {
+                let mut link = Fallback(<Link as HasLink>::Rel::default());
+                let mut s = NBytes::<F::CapacitySize>::default();
+                let mut info = Fallback(<LS as LinkStore<F, <Link as HasLink>::Rel>>::Info::default());
+                ctx.absorb(&mut link)?.mask(&mut s)?.absorb(&mut info)?;
+                let a: GenericArray<u8, F::CapacitySize> = s.into();
+                link_store.insert(&link.0, Inner::<F>::from(a), info.0)?;
+                Ok(ctx)
+            }).await?;
 
         let mut repeated_keys = Size(0);
         let mut key_store = Keys::default();
+
+
+
         ctx.absorb(&mut repeated_keys)?;
-        for _ in 0..repeated_keys.0 {
-            let mut link = Fallback(<Link as HasLink>::Rel::default());
-            let mut branch_no = Uint32(0);
-            let mut seq_no = Uint32(0);
-            let (id, ctx) = Identifier::unwrap_new(_store, ctx).await?;
-            ctx.absorb(&mut link)?.absorb(&mut branch_no)?.absorb(&mut seq_no)?;
-            key_store.insert_cursor(id, Cursor::new_at(link.0, branch_no.0, seq_no.0))?;
-        }
-            /*.repeated(repeated_keys, |ctx| async {
-                let mut link = Fallback(<Link as HasLink>::Rel::default());
-                let mut branch_no = Uint32(0);
-                let mut seq_no = Uint32(0);
-                let (id, ctx) = Identifier::unwrap_new(_store, ctx).await?;
-                ctx.absorb(&mut link)?.absorb(&mut branch_no)?.absorb(&mut seq_no)?;
-                key_store.insert_cursor(id, Cursor::new_at(link.0, branch_no.0, seq_no.0))?;
-                Ok(ctx)
-            }).await?*/
-            ctx.commit()?
-            .squeeze(Mac(32))?;
+            ctx.repeated(repeated_keys,  |ctx|
+                unwrap_repeat_keys::<F, Link, Keys, Store, IS>(ctx, _store, key_store.borrow_mut())
+            ).await?
+                .commit()?
+                .squeeze(Mac(32))?;
 
         let sig_sk = ed25519::SecretKey::from_bytes(sig_sk_bytes.as_ref()).unwrap();
         let sig_pk = ed25519::PublicKey::from(&sig_sk);
@@ -1306,7 +1278,7 @@ where
     <Link as HasLink>::Rel: Eq + fmt::Debug + SkipFallback<F> + AbsorbFallback<F>,
     LG: LinkGenerator<Link>,
     LS: LinkStore<F, <Link as HasLink>::Rel> + Default,
-    <LS as LinkStore<F, <Link as HasLink>::Rel>>::Info: AbsorbFallback<F>,
+    <LS as LinkStore<F, <Link as HasLink>::Rel>>::Info: AbsorbFallback<F> + Send + Sync,
     Keys: KeyStore<Cursor<<Link as HasLink>::Rel>, F>,
 {
     pub async fn export(&self, flag: u8, pwd: &str) -> Result<Vec<u8>> {
@@ -1344,7 +1316,7 @@ where
     <Link as HasLink>::Rel: Eq + fmt::Debug + SkipFallback<F> + AbsorbFallback<F>,
     LG: LinkGenerator<Link>,
     LS: LinkStore<F, <Link as HasLink>::Rel> + Default,
-    <LS as LinkStore<F, <Link as HasLink>::Rel>>::Info: Default + AbsorbFallback<F>,
+    <LS as LinkStore<F, <Link as HasLink>::Rel>>::Info: Default + AbsorbFallback<F> + Send + Sync,
     Keys: KeyStore<Cursor<<Link as HasLink>::Rel>, F> + Default,
 {
     pub async fn import(bytes: &[u8], flag: u8, pwd: &str) -> Result<Self> {

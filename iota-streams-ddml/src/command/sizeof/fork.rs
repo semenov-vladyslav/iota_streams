@@ -12,12 +12,12 @@ use core::future::Future;
 #[async_trait]
 impl<'a, F, C, Fut> Fork<'a, C, Fut> for Context<F>
 where
-    F: 'a + Send + Sync,
-    Fut: Future<Output=Result<()>> + Send + Sync,
-    C: 'a + FnMut(&'a mut Self) -> Fut + Send + Sync,
+    F: 'a + Send,
+    Fut: Future<Output=Result<&'a mut Self>> + Send,
+    C: 'a + FnMut(&'a mut Self) -> Fut + Send,
 {
-    async fn fork(mut self, mut cont: C) -> Result<()> {
-        cont(&mut self).await?;
-        Ok(())
+    async fn fork(&'a mut self, mut cont: C) -> Result<&'a mut Self> {
+        self = cont(&mut *self).await?;
+        Ok(self)
     }
 }

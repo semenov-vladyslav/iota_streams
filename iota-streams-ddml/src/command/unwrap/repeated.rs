@@ -16,8 +16,8 @@ use core::future::Future;
 #[async_trait]
 impl<'a, C, F: 'a + PRP, IS: 'a + io::IStream, Fut> Repeated<'a, Size, C, Fut> for Context<F, IS>
 where
-    Fut: Future<Output=Result<&'a mut Self>> + Send + Sync,
-    C: 'a + FnMut(&'a mut Self) -> Fut + Send + Sync,
+    Fut: Future<Output=Result<&'a mut Self>> + Send,
+    C: 'a + FnMut(&'a mut Self) -> Fut + Send,
 {
     async fn repeated(&'a mut self, n: Size, mut value_handle: C) -> Result<&'a mut Self> {
         let mut ctx = self;

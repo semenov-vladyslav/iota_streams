@@ -18,11 +18,11 @@ use core::future::Future;
 #[async_trait]
 impl<'a, F, I, C, Fut> Repeated<'a, I, C, Fut> for Context<F>
 where
-    F: 'a + Send + Sync,
-    I: iter::Iterator + Send + Sync + 'a,
-    <I as Iterator>::Item: Send + Sync,
-    Fut: Future<Output=Result<&'a mut Self>> + Send + Sync,
-    C: FnMut(&'a mut Self, <I as iter::Iterator>::Item) -> Fut + Send + Sync + 'a,
+    F: 'a + Send,
+    I: iter::Iterator + Send + 'a,
+    <I as Iterator>::Item: Send,
+    Fut: Future<Output=Result<&'a mut Self>> + Send,
+    C: FnMut(&'a mut Self, <I as iter::Iterator>::Item) -> Fut + Send + 'a,
 {
     async fn repeated(&'a mut self, values_iter: I, mut value_handle: C) -> Result<&'a mut Self> {
         for item in values_iter {

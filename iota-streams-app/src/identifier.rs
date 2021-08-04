@@ -115,8 +115,8 @@ impl<F: PRP, Store: Send + Sync> ContentWrap<F, Store> for Identifier {
 #[async_trait]
 impl<F: PRP, Store: Send + Sync> ContentUnwrap<F, Store> for Identifier {
     async fn unwrap<'c, IS: io::IStream + Send + Sync>(
-        &mut self,
-        _store: &Store,
+        &'c mut self,
+        _store: &'c Store,
         ctx: &'c mut unwrap::Context<F, IS>,
     ) -> Result<&'c mut unwrap::Context<F, IS>> {
         let (id, ctx) = Self::unwrap_new(_store, ctx).await?;

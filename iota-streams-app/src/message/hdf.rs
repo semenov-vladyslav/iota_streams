@@ -258,8 +258,8 @@ where
     Store: Send + Sync,
 {
     async fn unwrap<'c, IS: io::IStream + Send + Sync>(
-        &mut self,
-        _store: &Store,
+        &'c mut self,
+        _store: &'c Store,
         ctx: &'c mut unwrap::Context<F, IS>,
     ) -> Result<&'c mut unwrap::Context<F, IS>> {
         let mut content_type_and_payload_length = NBytes::<U2>::default();

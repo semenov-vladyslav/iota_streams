@@ -246,8 +246,8 @@ where
     LookupKeSk: for<'b> Fn(&'b LookupArg, &Identifier) -> Option<&'b x25519::StaticSecret> + Send + Sync,
 {
     async fn unwrap<'c, IS: Send + Sync + io::IStream>(
-        &mut self,
-        store: &Store,
+        &'c mut self,
+        store: &'c Store,
         ctx: &'c mut unwrap::Context<F, IS>,
     ) -> Result<&'c mut unwrap::Context<F, IS>> {
         let mut id_hash = External(NBytes::<U64>::default());

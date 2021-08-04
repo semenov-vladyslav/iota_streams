@@ -15,12 +15,12 @@ use core::future::Future;
 #[async_trait]
 impl<'a, C, F: 'a + PRP, IS: 'a + io::IStream, Fut> Fork<'a, C, Fut> for Context<F, IS>
 where
-    Fut: Future<Output=Result<()>> + Send + Sync,
-    C: 'a + FnMut(&'a mut Self) -> Fut + Send + Sync,
+    Fut: Future<Output=Result<&'a mut Self>> + Send,
+    C: 'a + FnMut(&'a mut Self) -> Fut + Send,
 {
-    async fn fork(mut self, mut cont: C) -> Result<Self> {
+    async fn fork(&'a mut self, mut cont: C) -> Result<&'a mut Self> {
         let saved_fork = self.spongos.fork();
-        cont(&mut self).await?;
+        self = cont(&mut *self).await?;
         self.spongos = saved_fork;
         Ok(self)
     }

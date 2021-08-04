@@ -15,19 +15,20 @@ use iota_streams_ddml::{
     link_store::LinkStore,
     types::*,
 };
-use iota_streams_core::prelude::{MutexGuard, Mutex};
-use core::borrow::BorrowMut;
+use iota_streams_core::prelude::{MutexGuard, Mutex, Arc};
+use core::borrow::{BorrowMut, Borrow};
+use core::ops::Deref;
 
 /// Message context prepared for wrapping.
 pub struct PreparedMessage<'a, F, Link: Default, Store: 'a, Content> {
-    store: &'a MutexGuard<'a, Store>,
+    store: &'a Arc<Mutex<Store>>,
     pub header: HDF<Link>,
     pub content: PCF<Content>,
     _phantom: core::marker::PhantomData<F>,
 }
 
 impl<'a, F, Link: Default, Store: 'a, Content> PreparedMessage<'a, F, Link, Store, Content> {
-    pub fn new(store: &'a MutexGuard<'a, Store>, header: HDF<Link>, content: Content) -> Self {
+    pub fn new(store: &'a Arc<Mutex<Store>>, header: HDF<Link>, content: Content) -> Self {
         let content = pcf::PCF::new_final_frame()
             .with_payload_frame_num(1)
             .unwrap()
@@ -63,8 +64,8 @@ where
 
         let spongos = {
             let mut ctx = wrap::Context::new(&mut buf[..]);
-            self.header.wrap(&*self.store, &mut ctx).await?;
-            self.content.wrap(&*self.store, &mut ctx).await?;
+            self.header.wrap(&*self.store.lock().as_ref().unwrap(), &mut ctx).await?;
+            self.content.wrap(&*self.store.lock().as_ref().unwrap(), &mut ctx).await?;
             try_or!(ctx.stream.is_empty(), OutputStreamNotFullyConsumed(ctx.stream.len()))?;
             ctx.spongos
         };

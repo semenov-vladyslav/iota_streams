@@ -154,8 +154,8 @@ where
     Store: Send + Sync,
 {
     async fn unwrap<'c, IS: io::IStream + Send + Sync>(
-        &mut self,
-        store: &Store,
+        &'c mut self,
+        store: &'c Store,
         mut ctx: &'c mut unwrap::Context<F, IS>,
     ) -> Result<&'c mut unwrap::Context<F, IS>> {
         ctx.absorb(&mut self.frame_type)?.skip(&mut self.payload_frame_num)?;

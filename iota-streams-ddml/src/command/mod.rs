@@ -80,7 +80,7 @@ pub trait X25519<SK, PK> {
 /// The trait can be implemented for functions `Fn(&mut self) -> Result<&mut Self>`.
 #[async_trait]
 pub trait Fork<'a, F, Fut> {
-    async fn fork(mut self, cont: F) -> Result<Self>;
+    async fn fork(&'a mut self, cont: F) -> Result<&'a mut Self>;
 }
 
 /// Join command. Spongos state for the linked message is retrieved from the context

@@ -240,14 +240,14 @@ pub async fn example<T: Transport + Clone>(transport: T) -> Result<()> where
         subscriberB.receive_keyload(&keyload_link).await?;
     }
 
-    let subAdump = subscriberA.export("pwdSubA").unwrap();
-    let _subscriberA2 = Subscriber::import(subAdump.as_ref(), "pwdSubA", transport.clone()).unwrap();
+    let subAdump = subscriberA.export("pwdSubA").await.unwrap();
+    let _subscriberA2 = Subscriber::import(subAdump.as_ref(), "pwdSubA", transport.clone()).await.unwrap();
 
-    let subBdump = subscriberB.export("pwdSubB").unwrap();
-    let _subscriberB2 = Subscriber::import(subBdump.as_ref(), "pwdSubB", transport.clone()).unwrap();
+    let subBdump = subscriberB.export("pwdSubB").await.unwrap();
+    let _subscriberB2 = Subscriber::import(subBdump.as_ref(), "pwdSubB", transport.clone()).await.unwrap();
 
-    let authordump = author.export("pwdAuthor").unwrap();
-    let _author2 = Author::import(authordump.as_ref(), "pwdAuthor", transport.clone()).unwrap();
+    let authordump = author.export("pwdAuthor").await.unwrap();
+    let _author2 = Author::import(authordump.as_ref(), "pwdAuthor", transport.clone()).await.unwrap();
 
     Ok(())
 }

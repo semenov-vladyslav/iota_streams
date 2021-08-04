@@ -137,8 +137,8 @@ where
     Store: LinkStore<F, <Link as HasLink>::Rel>,
 {
     async fn unwrap<'c, IS: io::IStream>(
-        &mut self,
-        store: &Store,
+        &'c mut self,
+        store: &'c Store,
         ctx: &'c mut unwrap::Context<F, IS>,
     ) -> Result<&'c mut unwrap::Context<F, IS>> {
         let mac = Mac(spongos::MacSize::<F>::USIZE);
