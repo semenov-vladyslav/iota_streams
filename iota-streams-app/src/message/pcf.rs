@@ -135,7 +135,7 @@ where
     Content: ContentWrap<F, Store> + Send + Sync,
     Store: Send + Sync
 {
-    async fn wrap<'c, OS: io::OStream>(
+    async fn wrap<'c, OS: io::OStream + Send + Sync>(
         &self,
         store: &Store,
         mut ctx: &'c mut wrap::Context<F, OS>,
@@ -153,7 +153,7 @@ where
     Content: ContentUnwrap<F, Store>,
     Store: Send + Sync,
 {
-    async fn unwrap<'c, IS: io::IStream>(
+    async fn unwrap<'c, IS: io::IStream + Send + Sync>(
         &mut self,
         store: &Store,
         mut ctx: &'c mut unwrap::Context<F, IS>,

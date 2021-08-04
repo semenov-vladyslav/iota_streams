@@ -20,7 +20,7 @@ pub trait ContentSizeof<F> {
 
 #[async_trait]
 pub trait ContentWrap<F, Store>: ContentSizeof<F> {
-    async fn wrap<'c, OS: io::OStream>(
+    async fn wrap<'c, OS: io::OStream + Send + Sync>(
         &self,
         store: &Store,
         ctx: &'c mut wrap::Context<F, OS>,
@@ -29,7 +29,7 @@ pub trait ContentWrap<F, Store>: ContentSizeof<F> {
 
 #[async_trait]
 pub trait ContentUnwrap<F, Store>: Send {
-    async fn unwrap<'c, IS: io::IStream>(
+    async fn unwrap<'c, IS: io::IStream + Send + Sync>(
         &mut self,
         store: &Store,
         ctx: &'c mut unwrap::Context<F, IS>,
@@ -41,7 +41,7 @@ pub trait ContentUnwrapNew<F, Store>: Send
 where
     Self: Sized,
 {
-    async fn unwrap_new<'c, IS: io::IStream>(
+    async fn unwrap_new<'c, IS: io::IStream + Send + Sync>(
         store: &Store,
         ctx: &'c mut unwrap::Context<F, IS>,
     ) -> Result<(Self, &'c mut unwrap::Context<F, IS>)>;

@@ -59,7 +59,9 @@ use iota_streams_app::{
     },
 };
 use iota_streams_core::{
+    async_trait,
     prelude::{
+        Box,
         typenum::Unsigned as _,
         Vec,
     },
@@ -93,24 +95,25 @@ pub struct ContentWrap<'a, F, Link: HasLink, Keys> {
     pub(crate) _phantom: core::marker::PhantomData<(F, Link)>,
 }
 
+#[async_trait]
 impl<'a, F, Link, Keys> message::ContentSizeof<F> for ContentWrap<'a, F, Link, Keys>
 where
     F: 'a + PRP, // weird 'a constraint, but compiler requires it somehow?!
     Link: HasLink,
     <Link as HasLink>::Rel: 'a + Eq + SkipFallback<F>,
-    Keys: Clone + ExactSizeIterator<Item = (&'a Identifier, Vec<u8>)>,
+    Keys: Clone + ExactSizeIterator<Item = (&'a Identifier, Vec<u8>)> + Send + Sync,
 {
-    fn sizeof<'c>(&self, ctx: &'c mut sizeof::Context<F>) -> Result<&'c mut sizeof::Context<F>> {
+    async fn sizeof<'c>(&self, ctx: &'c mut sizeof::Context<F>) -> Result<&'c mut sizeof::Context<F>> {
         let store = EmptyLinkStore::<F, <Link as HasLink>::Rel, ()>::default();
         let repeated_keys = Size(self.keys.len());
         ctx.join(&store, self.link)?
             .absorb(&self.nonce)?
-            .fork(|ctx| {
+            .fork(|ctx| async {
                 // fork into new context in order to hash Identifiers
                 ctx.absorb(repeated_keys)?
-                    .repeated(self.keys.clone().into_iter(), |ctx, (id, store_id)| {
-                        let ctx = id.sizeof(ctx)?;
-                        ctx.fork(|ctx| {
+                    .repeated(self.keys.clone().into_iter(), |ctx, (id, store_id)| async {
+                        let ctx = id.sizeof(ctx).await?;
+                        ctx.fork(|ctx| async {
                             // fork in order to skip the actual keyload data which may be unavailable to all recipients
                             match &id {
                                 Identifier::PskId(_pskid) => ctx
@@ -122,25 +125,28 @@ where
                                     &self.key,
                                 ),
                             }
-                        })
-                    })
-            })?
+                        }).await
+                    }).await
+            }).await?
             .absorb(External(&self.key))?
-            .fork(|ctx| ctx.ed25519(self.sig_kp, HashSig))?
+            .fork(|ctx| async {
+                ctx.ed25519(self.sig_kp, HashSig)
+            }).await?
             .commit()?;
         Ok(ctx)
     }
 }
 
+#[async_trait]
 impl<'a, F, Link, Store, Keys> message::ContentWrap<F, Store> for ContentWrap<'a, F, Link, Keys>
 where
     F: 'a + PRP, // weird 'a constraint, but compiler requires it somehow?!
     Link: HasLink,
     <Link as HasLink>::Rel: 'a + Eq + SkipFallback<F>,
     Store: LinkStore<F, <Link as HasLink>::Rel>,
-    Keys: Clone + ExactSizeIterator<Item = (&'a Identifier, Vec<u8>)>,
+    Keys: Clone + ExactSizeIterator<Item = (&'a Identifier, Vec<u8>)> + Send + Sync,
 {
-    fn wrap<'c, OS: io::OStream>(
+    async fn wrap<'c, OS: io::OStream + Send + Sync>(
         &self,
         store: &Store,
         ctx: &'c mut wrap::Context<F, OS>,
@@ -149,12 +155,12 @@ where
         let repeated_keys = Size(self.keys.len());
         ctx.join(store, self.link)?
             .absorb(&self.nonce)?
-            .fork(|ctx| {
+            .fork(|ctx| async {
                 // fork into new context in order to hash Identifiers
                 ctx.absorb(repeated_keys)?
-                    .repeated(self.keys.clone().into_iter(), |ctx, (id, store_id)| {
-                        let ctx = id.wrap(store, ctx)?;
-                        ctx.fork(|ctx| {
+                    .repeated(self.keys.clone().into_iter(), |ctx, (id, store_id)| async {
+                        let ctx = id.wrap(store, ctx).await?;
+                        ctx.fork(|ctx| async {
                             // fork in order to skip the actual keyload data which may be unavailable to all recipients
                             match &id {
                                 Identifier::PskId(_pskid) => ctx
@@ -166,13 +172,15 @@ where
                                     &self.key,
                                 ),
                             }
-                        })
-                    })?
+                        }).await
+                    }).await?
                     .commit()?
                     .squeeze(&mut id_hash)
-            })?
+            }).await?
             .absorb(External(&self.key))?
-            .fork(|ctx| ctx.absorb(&id_hash)?.ed25519(self.sig_kp, HashSig))?
+            .fork(|ctx| async {
+                ctx.absorb(&id_hash)?.ed25519(self.sig_kp, HashSig)
+            }).await?
             .commit()?;
         Ok(ctx)
     }
@@ -225,6 +233,7 @@ where
     }
 }
 
+#[async_trait]
 impl<'a, F, Link, Store, LookupArg, LookupPsk, LookupKeSk> message::ContentUnwrap<F, Store>
     for ContentUnwrap<'a, F, Link, LookupArg, LookupPsk, LookupKeSk>
 where
@@ -232,22 +241,22 @@ where
     Link: HasLink,
     <Link as HasLink>::Rel: Eq + Default + SkipFallback<F>,
     Store: LinkStore<F, <Link as HasLink>::Rel>,
-    LookupArg: 'a,
-    LookupPsk: for<'b> Fn(&'b LookupArg, &Identifier) -> Option<psk::Psk>,
-    LookupKeSk: for<'b> Fn(&'b LookupArg, &Identifier) -> Option<&'b x25519::StaticSecret>,
+    LookupArg: 'a + Send + Sync,
+    LookupPsk: for<'b> Fn(&'b LookupArg, &Identifier) -> Option<psk::Psk> + Send + Sync,
+    LookupKeSk: for<'b> Fn(&'b LookupArg, &Identifier) -> Option<&'b x25519::StaticSecret> + Send + Sync,
 {
-    fn unwrap<'c, IS: io::IStream>(
+    async fn unwrap<'c, IS: Send + Sync + io::IStream>(
         &mut self,
         store: &Store,
         ctx: &'c mut unwrap::Context<F, IS>,
     ) -> Result<&'c mut unwrap::Context<F, IS>> {
         let mut id_hash = External(NBytes::<U64>::default());
         let mut repeated_keys = Size(0);
-        ctx.join(store, &mut self.link)?.absorb(&mut self.nonce)?.fork(|ctx| {
+        ctx.join(store, &mut self.link)?.absorb(&mut self.nonce)?.fork(|ctx| async {
             ctx.absorb(&mut repeated_keys)?
-                .repeated(repeated_keys, |ctx| {
-                    let (id, ctx) = Identifier::unwrap_new(store, ctx)?;
-                    ctx.fork(|ctx| {
+                .repeated(repeated_keys, |ctx| async {
+                    let (id, ctx) = Identifier::unwrap_new(store, ctx).await?;
+                    ctx.fork(|ctx| async {
                         match &id {
                             Identifier::PskId(_id) => {
                                 if let Some(psk) = (self.lookup_psk)(self.lookup_arg, &id) {
@@ -283,15 +292,17 @@ where
                                 }
                             }
                         }
-                    })
-                })?
+                    }).await
+                }).await?
                 .commit()?
                 .squeeze(&mut id_hash)
-        })?;
+        }).await?;
 
         if let Some(ref key) = self.key {
             ctx.absorb(External(key))?
-                .fork(|ctx| ctx.absorb(&id_hash)?.ed25519(self.sig_pk, HashSig))?
+                .fork(|ctx| async {
+                    ctx.absorb(&id_hash)?.ed25519(self.sig_pk, HashSig)
+                }).await?
                 .commit()
         } else {
             // Allow key not found, no key situation must be handled outside, there's a use-case for that

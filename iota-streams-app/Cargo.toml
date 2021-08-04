@@ -44,6 +44,5 @@ iota-client = { git = "https://github.com/iotaledger/iota.rs", branch = "dev", d
 
 num_cpus = { version = "1.10", optional = true }
 
-futures = { version = "0.3.8", default-features = false  }
 cstr_core = { version = "0.2.2", default-features = false, features = ["alloc"] }
 cty = { version = "0.2.1" }

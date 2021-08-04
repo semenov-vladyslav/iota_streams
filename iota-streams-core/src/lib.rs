@@ -67,3 +67,4 @@ pub use errors::{
 
 pub use async_trait::async_trait;
 pub use crypto;
+pub use futures;

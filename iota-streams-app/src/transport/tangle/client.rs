@@ -1,5 +1,3 @@
-use futures::executor::block_on;
-
 #[cfg(feature = "async")]
 use core::cell::RefCell;
 use core::fmt;
@@ -20,6 +18,10 @@ use iota_client::bee_message::{
 
 use iota_streams_core::{
     err,
+    futures::{
+        executor::block_on,
+        future::join_all,
+    },
     prelude::Vec,
     try_or,
     wrapped_err,
@@ -35,8 +37,6 @@ use crate::{
         *,
     },
 };
-
-use futures::future::join_all;
 
 use iota_streams_core::prelude::String;
 

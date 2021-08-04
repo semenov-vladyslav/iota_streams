@@ -5,6 +5,7 @@ use core::fmt;
 use super::*;
 use iota_streams_core::sponge::prp::PRP;
 use iota_streams_ddml::command::unwrap;
+use iota_streams_core::prelude::MutexGuard;
 
 /// Message context preparsed for unwrapping.
 pub struct PreparsedMessage<'a, F, Link: Default> {
@@ -23,7 +24,7 @@ impl<'a, F, Link: Default + Clone> PreparsedMessage<'a, F, Link> {
 
     pub async fn unwrap<Store, Content>(
         mut self,
-        store: &Store,
+        store: &MutexGuard<'_, Store>,
         content: Content,
     ) -> Result<UnwrappedMessage<F, Link, Content>>
     where

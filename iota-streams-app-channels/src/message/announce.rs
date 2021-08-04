@@ -21,7 +21,11 @@
 //!
 //! * `sig` -- signature of `tag` field produced with the Ed25519 private key corresponding to ed25519pk`.
 
-use iota_streams_core::Result;
+use iota_streams_core::{
+    async_trait,
+    prelude::Box,
+    Result
+};
 
 use iota_streams_app::message;
 use iota_streams_core::sponge::prp::PRP;
@@ -51,8 +55,9 @@ impl<'a, F> ContentWrap<'a, F> {
     }
 }
 
+#[async_trait]
 impl<'a, F: PRP> message::ContentSizeof<F> for ContentWrap<'a, F> {
-    fn sizeof<'c>(&self, ctx: &'c mut sizeof::Context<F>) -> Result<&'c mut sizeof::Context<F>> {
+    async fn sizeof<'c>(&self, ctx: &'c mut sizeof::Context<F>) -> Result<&'c mut sizeof::Context<F>> {
         ctx.absorb(&self.sig_kp.public)?;
         ctx.absorb(&self.flags)?;
         ctx.ed25519(self.sig_kp, HashSig)?;
@@ -60,8 +65,9 @@ impl<'a, F: PRP> message::ContentSizeof<F> for ContentWrap<'a, F> {
     }
 }
 
-impl<'a, F: PRP, Store> message::ContentWrap<F, Store> for ContentWrap<'a, F> {
-    fn wrap<'c, OS: io::OStream>(
+#[async_trait]
+impl<'a, F: PRP, Store: Send + Sync> message::ContentWrap<F, Store> for ContentWrap<'a, F> {
+    async fn wrap<'c, OS: io::OStream>(
         &self,
         _store: &Store,
         ctx: &'c mut wrap::Context<F, OS>,
@@ -97,11 +103,13 @@ impl<F> Default for ContentUnwrap<F> {
     }
 }
 
+#[async_trait]
 impl<F, Store> message::ContentUnwrap<F, Store> for ContentUnwrap<F>
 where
     F: PRP,
+    Store: Send + Sync,
 {
-    fn unwrap<'c, IS: io::IStream>(
+    async fn unwrap<'c, IS: io::IStream>(
         &mut self,
         _store: &Store,
         ctx: &'c mut unwrap::Context<F, IS>,

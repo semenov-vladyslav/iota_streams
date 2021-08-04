@@ -2,11 +2,18 @@ use core::cell::RefMut;
 use iota_streams_core::Result;
 
 use super::*;
-use iota_streams_core::sponge::{
-    prp::PRP,
-    spongos::Spongos,
+use iota_streams_core::{
+    prelude::{
+        Arc, Mutex
+    },
+    sponge::{
+        prp::PRP,
+        spongos::Spongos,
+    }
 };
 use iota_streams_ddml::link_store::LinkStore;
+use core::borrow::BorrowMut;
+use iota_streams_core::prelude::MutexGuard;
 
 /// Result of wrapping the message.
 pub struct UnwrappedMessage<F, Link, Content> {
@@ -23,11 +30,11 @@ where
     /// Save link for the current unwrapped message and associated info into the store.
     pub fn commit<Store>(
         mut self,
-        mut store: RefMut<Store>,
+        mut store: &mut MutexGuard<Store>,
         info: <Store as LinkStore<F, <Link as HasLink>::Rel>>::Info,
     ) -> Result<Content>
     where
-        Store: LinkStore<F, <Link as HasLink>::Rel>,
+        Store: LinkStore<F, <Link as HasLink>::Rel> + Send + Sync,
     {
         self.spongos.commit();
         store.update(self.link.rel(), self.spongos, info)?;

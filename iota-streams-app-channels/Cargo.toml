@@ -12,11 +12,10 @@ description = "A rust implementation of the IOTA Streams Channels Application"
 default = ["std", "tangle", "sync-client"]
 # Enable `std` feature in dependencies
 std = ["iota-streams-core/std", "iota-streams-core-edsig/std", "iota-streams-ddml/std", "iota-streams-app/std", "hex/std"]
-async = ["iota-streams-app/async"]
 tangle = ["iota-streams-app/tangle"]
 sync-client = ["iota-streams-app/sync-client", "tangle", "std"]
-async-client = ["iota-streams-app/async-client", "tangle", "std", "async"]
-wasm-client = ["iota-streams-app/wasm-client", "tangle", "std", "async"]
+async-client = ["iota-streams-app/async-client", "tangle", "std"]
+wasm-client = ["iota-streams-app/wasm-client", "tangle", "std"]
 
 [lib]
 name = "iota_streams_app_channels"

@@ -15,17 +15,19 @@ use iota_streams_ddml::{
     link_store::LinkStore,
     types::*,
 };
+use iota_streams_core::prelude::{MutexGuard, Mutex};
+use core::borrow::BorrowMut;
 
 /// Message context prepared for wrapping.
 pub struct PreparedMessage<'a, F, Link: Default, Store: 'a, Content> {
-    store: Ref<'a, Store>,
+    store: &'a MutexGuard<'a, Store>,
     pub header: HDF<Link>,
     pub content: PCF<Content>,
     _phantom: core::marker::PhantomData<F>,
 }
 
 impl<'a, F, Link: Default, Store: 'a, Content> PreparedMessage<'a, F, Link, Store, Content> {
-    pub fn new(store: Ref<'a, Store>, header: HDF<Link>, content: Content) -> Self {
+    pub fn new(store: &'a MutexGuard<'a, Store>, header: HDF<Link>, content: Content) -> Self {
         let content = pcf::PCF::new_final_frame()
             .with_payload_frame_num(1)
             .unwrap()

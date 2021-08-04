@@ -37,7 +37,7 @@ exclude = [
 default = ["std", "tangle", "sync-client"]
 # Enable `std` feature in dependencies
 std = ["iota-streams-core/std", "iota-streams-core-edsig/std", "iota-streams-ddml/std", "iota-streams-app/std", "iota-streams-app-channels/std"]
-async = ["iota-streams-app/async", "iota-streams-app-channels/async"]
+async = ["iota-streams-app/async"]
 tangle = ["iota-streams-app/tangle", "iota-streams-app-channels/tangle"]
 sync-client = ["iota-streams-app/sync-client", "iota-streams-app-channels/sync-client"]
 async-client = ["iota-streams-app/async-client", "iota-streams-app-channels/async-client"]

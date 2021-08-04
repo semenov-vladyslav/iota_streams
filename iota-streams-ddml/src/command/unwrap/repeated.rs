@@ -6,16 +6,24 @@ use crate::{
     io,
     types::Size,
 };
-use iota_streams_core::sponge::prp::PRP;
+use iota_streams_core::{
+    async_trait,
+    prelude::Box,
+    sponge::prp::PRP
+};
+use core::future::Future;
 
-impl<C, F: PRP, IS: io::IStream> Repeated<Size, C> for Context<F, IS>
+#[async_trait]
+impl<'a, C, F: 'a + PRP, IS: 'a + io::IStream, Fut> Repeated<'a, Size, C, Fut> for Context<F, IS>
 where
-    C: for<'a> FnMut(&'a mut Self) -> Result<&'a mut Self>,
+    Fut: Future<Output=Result<&'a mut Self>> + Send + Sync,
+    C: 'a + FnMut(&'a mut Self) -> Fut + Send + Sync,
 {
-    fn repeated(&mut self, n: Size, mut value_handle: C) -> Result<&mut Self> {
+    async fn repeated(&'a mut self, n: Size, mut value_handle: C) -> Result<&'a mut Self> {
+        let mut ctx = self;
         for _ in 0..(n.0) {
-            value_handle(self)?;
+            ctx = value_handle(ctx).await?;
         }
-        Ok(self)
+        Ok(ctx)
     }
 }

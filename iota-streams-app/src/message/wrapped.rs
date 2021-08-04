@@ -10,6 +10,7 @@ use iota_streams_core::sponge::{
     spongos::Spongos,
 };
 use iota_streams_ddml::link_store::LinkStore;
+use iota_streams_core::prelude::MutexGuard;
 
 /// Spongos state and representative Link identifier
 pub struct WrapState<F, Link> {
@@ -21,7 +22,7 @@ impl<F: PRP, Link: HasLink> WrapState<F, Link> {
     /// Save link for the current wrapped message and accociated info into the store.
     pub fn commit<Store>(
         mut self,
-        mut store: RefMut<Store>,
+        mut store: &mut MutexGuard<Store>,
         info: <Store as LinkStore<F, <Link as HasLink>::Rel>>::Info,
     ) -> Result<Link>
     where
