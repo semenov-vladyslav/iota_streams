@@ -26,7 +26,7 @@ use core::cell::RefCell;
 
 use super::utils;
 
-pub fn example<T: Transport>(transport: Rc<RefCell<T>>, channel_impl: ChannelType, seed: &str) -> Result<()> {
+pub async fn example<T: Transport>(transport: Rc<RefCell<T>>, channel_impl: ChannelType, seed: &str) -> Result<()> {
     let mut author = Author::new(seed, channel_impl, transport.clone());
     println!("Author multi branching?: {}", author.is_multi_branching());
 
@@ -39,7 +39,7 @@ pub fn example<T: Transport>(transport: Rc<RefCell<T>>, channel_impl: ChannelTyp
 
     println!("\nAnnounce Channel");
     let announcement_link = {
-        let msg = author.send_announce()?;
+        let msg = author.send_announce().await?;
         println!("  msg => <{}> {:?}", msg.msgid, msg);
         print!("  Author     : {}", author);
         msg
@@ -48,19 +48,19 @@ pub fn example<T: Transport>(transport: Rc<RefCell<T>>, channel_impl: ChannelTyp
 
     println!("\nHandle Announce Channel");
     {
-        subscriberA.receive_announcement(&announcement_link)?;
+        subscriberA.receive_announcement(&announcement_link).await?;
         print!("  SubscriberA: {}", subscriberA);
         try_or!(
             author.channel_address() == subscriberA.channel_address(),
             ApplicationInstanceMismatch(String::from("A"))
         )?;
-        subscriberB.receive_announcement(&announcement_link)?;
+        subscriberB.receive_announcement(&announcement_link).await?;
         print!("  SubscriberB: {}", subscriberB);
         try_or!(
             author.channel_address() == subscriberB.channel_address(),
             ApplicationInstanceMismatch(String::from("B"))
         )?;
-        subscriberC.receive_announcement(&announcement_link)?;
+        subscriberC.receive_announcement(&announcement_link).await?;
         print!("  SubscriberC: {}", subscriberC);
         try_or!(
             author.channel_address() == subscriberC.channel_address(),
@@ -90,7 +90,7 @@ pub fn example<T: Transport>(transport: Rc<RefCell<T>>, channel_impl: ChannelTyp
 
     println!("\nSubscribe A");
     let subscribeA_link = {
-        let msg = subscriberA.send_subscribe(&announcement_link)?;
+        let msg = subscriberA.send_subscribe(&announcement_link).await?;
         println!("  msg => <{}> {:?}", msg.msgid, msg);
         print!("  SubscriberA: {}", subscriberA);
         msg
@@ -98,13 +98,13 @@ pub fn example<T: Transport>(transport: Rc<RefCell<T>>, channel_impl: ChannelTyp
 
     println!("\nHandle Subscribe A");
     {
-        author.receive_subscribe(&subscribeA_link)?;
+        author.receive_subscribe(&subscribeA_link).await?;
         print!("  Author     : {}", author);
     }
 
     println!("\nSubscribe B");
     let subscribeB_link = {
-        let msg = subscriberB.send_subscribe(&announcement_link)?;
+        let msg = subscriberB.send_subscribe(&announcement_link).await?;
         println!("  msg => <{}> {:?}", msg.msgid, msg);
         print!("  SubscriberB: {}", subscriberB);
         msg
@@ -112,13 +112,13 @@ pub fn example<T: Transport>(transport: Rc<RefCell<T>>, channel_impl: ChannelTyp
 
     println!("\nHandle Subscribe B");
     {
-        author.receive_subscribe(&subscribeB_link)?;
+        author.receive_subscribe(&subscribeB_link).await?;
         print!("  Author     : {}", author);
     }
 
     println!("\nShare keyload for everyone [SubscriberA, SubscriberB, PSK]");
     let previous_msg_link = {
-        let (msg, seq) = author.send_keyload_for_everyone(&announcement_link)?;
+        let (msg, seq) = author.send_keyload_for_everyone(&announcement_link).await?;
         println!("  msg => <{}> {:?}", msg.msgid, msg);
         panic_if_not(seq.is_none());
         print!("  Author     : {}", author);
@@ -127,17 +127,17 @@ pub fn example<T: Transport>(transport: Rc<RefCell<T>>, channel_impl: ChannelTyp
 
     println!("\nHandle Keyload");
     {
-        subscriberA.receive_keyload(&previous_msg_link)?;
+        subscriberA.receive_keyload(&previous_msg_link).await?;
         print!("  SubscriberA: {}", subscriberA);
-        subscriberB.receive_keyload(&previous_msg_link)?;
+        subscriberB.receive_keyload(&previous_msg_link).await?;
         print!("  SubscriberB: {}", subscriberB);
-        subscriberC.receive_keyload(&previous_msg_link)?;
+        subscriberC.receive_keyload(&previous_msg_link).await?;
         print!("  SubscriberC: {}", subscriberC);
     }
 
     println!("\nSigned packet");
     let previous_msg_link = {
-        let (msg, seq) = author.send_signed_packet(&previous_msg_link, &public_payload, &masked_payload)?;
+        let (msg, seq) = author.send_signed_packet(&previous_msg_link, &public_payload, &masked_payload).await?;
         println!("  msg => <{}> {:?}", msg.msgid, msg);
         panic_if_not(seq.is_none());
         print!("  Author     : {}", author);
@@ -146,7 +146,7 @@ pub fn example<T: Transport>(transport: Rc<RefCell<T>>, channel_impl: ChannelTyp
 
     println!("\nHandle Signed packet");
     {
-        let (_signer_pk, unwrapped_public, unwrapped_masked) = subscriberA.receive_signed_packet(&previous_msg_link)?;
+        let (_signer_pk, unwrapped_public, unwrapped_masked) = subscriberA.receive_signed_packet(&previous_msg_link).await?;
         print!("  SubscriberA: {}", subscriberA);
         try_or!(
             public_payload == unwrapped_public,
@@ -159,13 +159,13 @@ pub fn example<T: Transport>(transport: Rc<RefCell<T>>, channel_impl: ChannelTyp
     }
 
     println!("\nSubscriber A fetching transactions...");
-    utils::s_fetch_next_messages(&mut subscriberA);
+    utils::s_fetch_next_messages(&mut subscriberA).await;
     println!("\nSubscriber C fetching transactions...");
-    utils::s_fetch_next_messages(&mut subscriberC);
+    utils::s_fetch_next_messages(&mut subscriberC).await;
 
     println!("\nTagged packet 1 - SubscriberA");
     let previous_msg_link = {
-        let (msg, seq) = subscriberA.send_tagged_packet(&previous_msg_link, &public_payload, &masked_payload)?;
+        let (msg, seq) = subscriberA.send_tagged_packet(&previous_msg_link, &public_payload, &masked_payload).await?;
         println!("  msg => <{}> {:?}", msg.msgid, msg);
         panic_if_not(seq.is_none());
         print!("  SubscriberA: {}", subscriberA);
@@ -174,7 +174,7 @@ pub fn example<T: Transport>(transport: Rc<RefCell<T>>, channel_impl: ChannelTyp
 
     println!("\nHandle Tagged packet 1");
     {
-        let (unwrapped_public, unwrapped_masked) = author.receive_tagged_packet(&previous_msg_link)?;
+        let (unwrapped_public, unwrapped_masked) = author.receive_tagged_packet(&previous_msg_link).await?;
         print!("  Author     : {}", author);
         try_or!(
             public_payload == unwrapped_public,
@@ -185,7 +185,7 @@ pub fn example<T: Transport>(transport: Rc<RefCell<T>>, channel_impl: ChannelTyp
             PublicPayloadMismatch(masked_payload.to_string(), unwrapped_masked.to_string())
         )?;
 
-        let  (unwrapped_public, unwrapped_masked) = subscriberC.receive_tagged_packet(&previous_msg_link)?;
+        let  (unwrapped_public, unwrapped_masked) = subscriberC.receive_tagged_packet(&previous_msg_link).await?;
         print!("  SubscriberC: {}", subscriberC);
         try_or!(
             public_payload == unwrapped_public,
@@ -199,7 +199,7 @@ pub fn example<T: Transport>(transport: Rc<RefCell<T>>, channel_impl: ChannelTyp
 
     println!("\nTagged packet 2 - SubscriberA");
     let previous_msg_link = {
-        let (msg, seq) = subscriberA.send_tagged_packet(&previous_msg_link, &public_payload, &masked_payload)?;
+        let (msg, seq) = subscriberA.send_tagged_packet(&previous_msg_link, &public_payload, &masked_payload).await?;
         println!("  msg => <{}> {:?}", msg.msgid, msg);
         panic_if_not(seq.is_none());
         print!("  SubscriberA: {}", subscriberA);
@@ -208,7 +208,7 @@ pub fn example<T: Transport>(transport: Rc<RefCell<T>>, channel_impl: ChannelTyp
 
     println!("\nTagged packet 3 - SubscriberA");
     let previous_msg_link = {
-        let (msg, seq) = subscriberA.send_tagged_packet(&previous_msg_link, &public_payload, &masked_payload)?;
+        let (msg, seq) = subscriberA.send_tagged_packet(&previous_msg_link, &public_payload, &masked_payload).await?;
         println!("  msg => <{}> {:?}", msg.msgid, msg);
         panic_if_not(seq.is_none());
         print!("  SubscriberA: {}", subscriberA);
@@ -216,13 +216,13 @@ pub fn example<T: Transport>(transport: Rc<RefCell<T>>, channel_impl: ChannelTyp
     };
 
     println!("\nSubscriber B fetching transactions...");
-    utils::s_fetch_next_messages(&mut subscriberB);
+    utils::s_fetch_next_messages(&mut subscriberB).await;
     println!("\nSubscriber C fetching transactions...");
-    utils::s_fetch_next_messages(&mut subscriberC);
+    utils::s_fetch_next_messages(&mut subscriberC).await;
 
     println!("\nTagged packet 4 - SubscriberB");
     let previous_msg_link = {
-        let (msg, seq) = subscriberB.send_tagged_packet(&previous_msg_link, &public_payload, &masked_payload)?;
+        let (msg, seq) = subscriberB.send_tagged_packet(&previous_msg_link, &public_payload, &masked_payload).await?;
         println!("  msg => <{}> {:?}", msg.msgid, msg);
         panic_if_not(seq.is_none());
         print!("  SubscriberB: {}", subscriberB);
@@ -231,7 +231,7 @@ pub fn example<T: Transport>(transport: Rc<RefCell<T>>, channel_impl: ChannelTyp
 
     println!("\nHandle Tagged packet 4");
     {
-        let (unwrapped_public, unwrapped_masked) = subscriberA.receive_tagged_packet(&previous_msg_link)?;
+        let (unwrapped_public, unwrapped_masked) = subscriberA.receive_tagged_packet(&previous_msg_link).await?;
         print!("  SubscriberA: {}", subscriberA);
         try_or!(
             public_payload == unwrapped_public,
@@ -243,7 +243,7 @@ pub fn example<T: Transport>(transport: Rc<RefCell<T>>, channel_impl: ChannelTyp
         )?;
 
         println!("Subscriber C unwrapping");
-        let (unwrapped_public, unwrapped_masked) = subscriberC.receive_tagged_packet(&previous_msg_link)?;
+        let (unwrapped_public, unwrapped_masked) = subscriberC.receive_tagged_packet(&previous_msg_link).await?;
         print!("  SubscriberC: {}", subscriberC);
         try_or!(
             public_payload == unwrapped_public,
@@ -257,12 +257,12 @@ pub fn example<T: Transport>(transport: Rc<RefCell<T>>, channel_impl: ChannelTyp
     }
 
     println!("\nSubscriber fetching transactions...");
-    utils::s_fetch_next_messages(&mut subscriberC);
+    utils::s_fetch_next_messages(&mut subscriberC).await;
 
 
     println!("\nTagged packet 5 - SubscriberC");
     let previous_msg_link = {
-        let (msg, seq) = subscriberC.send_tagged_packet(&previous_msg_link, &public_payload, &masked_payload)?;
+        let (msg, seq) = subscriberC.send_tagged_packet(&previous_msg_link, &public_payload, &masked_payload).await?;
         println!("  msg => <{}> {:?}", msg.msgid, msg);
         panic_if_not(seq.is_none());
         print!("  SubscriberC: {}", subscriberC);
@@ -271,7 +271,7 @@ pub fn example<T: Transport>(transport: Rc<RefCell<T>>, channel_impl: ChannelTyp
 
     println!("\nHandle Tagged packet 5");
     {
-        let (unwrapped_public, unwrapped_masked) = subscriberA.receive_tagged_packet(&previous_msg_link)?;
+        let (unwrapped_public, unwrapped_masked) = subscriberA.receive_tagged_packet(&previous_msg_link).await?;
         print!("  SubscriberA: {}", subscriberA);
         try_or!(
             public_payload == unwrapped_public,
@@ -282,7 +282,7 @@ pub fn example<T: Transport>(transport: Rc<RefCell<T>>, channel_impl: ChannelTyp
             PublicPayloadMismatch(masked_payload.to_string(), unwrapped_masked.to_string())
         )?;
 
-        let (unwrapped_public, unwrapped_masked) = subscriberB.receive_tagged_packet(&previous_msg_link)?;
+        let (unwrapped_public, unwrapped_masked) = subscriberB.receive_tagged_packet(&previous_msg_link).await?;
         print!("  SubscriberB: {}", subscriberB);
         try_or!(
             public_payload == unwrapped_public,
@@ -295,11 +295,11 @@ pub fn example<T: Transport>(transport: Rc<RefCell<T>>, channel_impl: ChannelTyp
     }
 
     println!("\nAuthor fetching transactions...");
-    utils::a_fetch_next_messages(&mut author);
+    utils::a_fetch_next_messages(&mut author).await;
 
     println!("\nSigned packet");
     let signed_packet_link = {
-        let (msg, seq) = author.send_signed_packet(&previous_msg_link, &public_payload, &masked_payload)?;
+        let (msg, seq) = author.send_signed_packet(&previous_msg_link, &public_payload, &masked_payload).await?;
         println!("  msg => <{}> {:?}", msg.msgid, msg);
         panic_if_not(seq.is_none());
         print!("  Author     : {}", author);
@@ -309,7 +309,7 @@ pub fn example<T: Transport>(transport: Rc<RefCell<T>>, channel_impl: ChannelTyp
     println!("\nHandle Signed packet");
     {
         let (_signer_pk, unwrapped_public, unwrapped_masked) =
-            subscriberA.receive_signed_packet(&signed_packet_link)?;
+            subscriberA.receive_signed_packet(&signed_packet_link).await?;
         print!("  SubscriberA: {}", subscriberA);
         try_or!(
             public_payload == unwrapped_public,
@@ -321,7 +321,7 @@ pub fn example<T: Transport>(transport: Rc<RefCell<T>>, channel_impl: ChannelTyp
         )?;
 
         let (_signer_pk, unwrapped_public, unwrapped_masked) =
-            subscriberB.receive_signed_packet(&signed_packet_link)?;
+            subscriberB.receive_signed_packet(&signed_packet_link).await?;
         print!("  SubscriberB: {}", subscriberB);
         try_or!(
             public_payload == unwrapped_public,
@@ -335,7 +335,7 @@ pub fn example<T: Transport>(transport: Rc<RefCell<T>>, channel_impl: ChannelTyp
 
     println!("\nSubscriber A checking previous message");
     {
-        let msg = subscriberA.fetch_prev_msg(&signed_packet_link)?;
+        let msg = subscriberA.fetch_prev_msg(&signed_packet_link).await?;
         println!("Found message: {}", msg.link.msgid);
         try_or!(
             msg.link == previous_msg_link,
@@ -346,7 +346,7 @@ pub fn example<T: Transport>(transport: Rc<RefCell<T>>, channel_impl: ChannelTyp
 
     println!("\nSubscriber B checking 5 previous messages");
     {
-        let msgs = subscriberB.fetch_prev_msgs(&signed_packet_link, 5)?;
+        let msgs = subscriberB.fetch_prev_msgs(&signed_packet_link, 5).await?;
         try_or!(msgs.len() == 5, ValueMismatch(5, msgs.len()))?;
         println!("Found {} messages", msgs.len());
         println!("  SubscriberB: {}", subscriberB);
