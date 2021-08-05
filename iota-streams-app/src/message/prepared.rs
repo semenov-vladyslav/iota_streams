@@ -1,4 +1,3 @@
-use core::cell::Ref;
 use iota_streams_core::Result;
 
 use super::*;
@@ -15,9 +14,7 @@ use iota_streams_ddml::{
     link_store::LinkStore,
     types::*,
 };
-use iota_streams_core::prelude::{MutexGuard, Mutex, Arc};
-use core::borrow::{BorrowMut, Borrow};
-use core::ops::Deref;
+use iota_streams_core::prelude::{Mutex, Arc};
 
 /// Message context prepared for wrapping.
 pub struct PreparedMessage<'a, F, Link: Default, Store: 'a, Content> {
@@ -64,8 +61,8 @@ where
 
         let spongos = {
             let mut ctx = wrap::Context::new(&mut buf[..]);
-            self.header.wrap(&*self.store.lock().as_ref().unwrap(), &mut ctx).await?;
-            self.content.wrap(&*self.store.lock().as_ref().unwrap(), &mut ctx).await?;
+            self.header.wrap(&*self.store.lock().await, &mut ctx).await?;
+            self.content.wrap(&*self.store.lock().await, &mut ctx).await?;
             try_or!(ctx.stream.is_empty(), OutputStreamNotFullyConsumed(ctx.stream.len()))?;
             ctx.spongos
         };

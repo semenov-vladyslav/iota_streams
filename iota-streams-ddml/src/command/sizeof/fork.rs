@@ -1,23 +1,14 @@
-use iota_streams_core::{
-    async_trait,
-    prelude::Box,
-    Result
-};
+use iota_streams_core::Result;
 
 use super::Context;
 use crate::command::Fork;
-use core::future::Future;
 
 /// Forks cost nothing in the trinary stream.
-#[async_trait]
-impl<'a, F, C, Fut> Fork<'a, C, Fut> for Context<F>
+impl<F, C> Fork<C> for Context<F>
 where
-    F: 'a + Send,
-    Fut: Future<Output=Result<&'a mut Self>> + Send,
-    C: 'a + FnMut(&'a mut Self) -> Fut + Send,
+    C: for<'a> FnMut(&'a mut Self) -> Result<&'a mut Self>,
 {
-    async fn fork(&'a mut self, mut cont: C) -> Result<&'a mut Self> {
-        self = cont(&mut *self).await?;
-        Ok(self)
+    fn fork(&mut self, mut cont: C) -> Result<&mut Self> {
+        cont(self)
     }
 }

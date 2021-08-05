@@ -5,22 +5,15 @@ use crate::{
     command::Fork,
     io,
 };
-use iota_streams_core::{
-    async_trait,
-    prelude::Box,
-    sponge::prp::PRP
-};
-use core::future::Future;
+use iota_streams_core::sponge::prp::PRP;
 
-#[async_trait]
-impl<'a, C, F: 'a + PRP, IS: 'a + io::IStream, Fut> Fork<'a, C, Fut> for Context<F, IS>
+impl<C, F: PRP, IS: io::IStream> Fork<C> for Context<F, IS>
 where
-    Fut: Future<Output=Result<&'a mut Self>> + Send,
-    C: 'a + FnMut(&'a mut Self) -> Fut + Send,
+    C: for<'a> FnMut(&'a mut Self) -> Result<&'a mut Self>,
 {
-    async fn fork(&'a mut self, mut cont: C) -> Result<&'a mut Self> {
+    fn fork(&mut self, mut cont: C) -> Result<&mut Self> {
         let saved_fork = self.spongos.fork();
-        self = cont(&mut *self).await?;
+        cont(self)?;
         self.spongos = saved_fork;
         Ok(self)
     }

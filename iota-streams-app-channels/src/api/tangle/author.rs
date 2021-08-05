@@ -329,7 +329,7 @@ impl<Trans: Transport + Clone> Author<Trans> {
         let retrieved: Message = author.user.transport.recv_message(announcement)?;
         panic_if_not(retrieved.binary == ann.message);
 
-        author.user.commit_wrapped(ann.wrapped, MsgInfo::Announce)?;
+        author.user.commit_wrapped(ann.wrapped, MsgInfo::Announce).await?;
         author.sync_state().await;
 
         Ok(author)

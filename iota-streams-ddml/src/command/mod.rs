@@ -21,11 +21,7 @@
 //!
 //! Command traits are implemented in modules `sizeof`, `wrap`, `unwrap`.
 
-use iota_streams_core::{
-    async_trait,
-    prelude::Box,
-    Result
-};
+use iota_streams_core::Result;
 
 use iota_streams_core::{
     println,
@@ -78,9 +74,8 @@ pub trait X25519<SK, PK> {
 /// After the fork is finished the resulting Spongos state is discarded and
 /// field processing continues using the saved current Spongos state.
 /// The trait can be implemented for functions `Fn(&mut self) -> Result<&mut Self>`.
-#[async_trait]
-pub trait Fork<'a, F, Fut> {
-    async fn fork(&'a mut self, cont: F) -> Result<&'a mut Self>;
+pub trait Fork<F> {
+    fn fork(&mut self, cont: F) -> Result<&mut Self>;
 }
 
 /// Join command. Spongos state for the linked message is retrieved from the context
@@ -94,11 +89,10 @@ pub trait Join<L, S> {
 }
 
 /// Repeated modifier.
-#[async_trait]
-pub trait Repeated<'a, I, F, Fut> {
+pub trait Repeated<I, F> {
     /// `values_iter` provides some iterated values or counter.
     /// `value_handler` handles one item.
-    async fn repeated(&'a mut self, values_iter: I, value_handle: F) -> Result<&'a mut Self>;
+    fn repeated(&mut self, values_iter: I, value_handle: F) -> Result<&mut Self>;
 }
 
 /// Condition guard.
