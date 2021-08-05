@@ -1,8 +1,14 @@
-#[cfg(feature = "async")]
+#[cfg(not(feature = "sync-client"))]
 use core::cell::RefCell;
 use core::fmt;
-#[cfg(feature = "async")]
-use iota_streams_core::prelude::Rc;
+#[cfg(not(feature = "sync-client"))]
+use iota_streams_core::{
+    async_trait,
+    prelude::{
+        Box,
+        Rc,
+    }
+};
 
 pub use iota_client;
 
@@ -170,19 +176,19 @@ pub async fn async_get_link_details(client: &iota_client::Client, link: &TangleA
 }
 
 /// Synchronised - Send message to the tangle using a node client
-#[cfg(not(feature = "async"))]
+#[cfg(feature = "sync-client")]
 pub fn sync_send_message_with_options<F>(client: &iota_client::Client, msg: &TangleMessage<F>) -> Result<()> {
     block_on(async_send_message_with_options(client, msg))
 }
 
 /// Synchronised - Retrieve a message from the tangle using a node client
-#[cfg(not(feature = "async"))]
+#[cfg(feature = "sync-client")]
 pub fn sync_recv_messages<F>(client: &iota_client::Client, link: &TangleAddress) -> Result<Vec<TangleMessage<F>>> {
     block_on(async_recv_messages(client, link))
 }
 
 /// Synchronised - Retrieve details of a link from the tangle using a node client
-#[cfg(not(feature = "async"))]
+#[cfg(feature = "sync-client")]
 pub fn sync_get_link_details(client: &iota_client::Client, link: &TangleAddress) -> Result<Details> {
     block_on(async_get_link_details(client, link))
 }
@@ -270,7 +276,7 @@ impl TransportOptions for Client {
     fn set_recv_options(&mut self, _opt: ()) {}
 }
 
-#[cfg(not(feature = "async"))]
+#[cfg(feature = "sync-client")]
 impl TransportDetails<TangleAddress> for Client {
     type Details = Details;
     fn get_link_details(&mut self, link: &TangleAddress) -> Result<Self::Details> {
@@ -278,7 +284,7 @@ impl TransportDetails<TangleAddress> for Client {
     }
 }
 
-#[cfg(not(feature = "async"))]
+#[cfg(feature = "sync-client")]
 impl<F> Transport<TangleAddress, TangleMessage<F>> for Client {
     /// Send a Streams message over the Tangle with the current timestamp and default SendOptions.
     fn send_message(&mut self, msg: &TangleMessage<F>) -> Result<()> {
@@ -291,7 +297,7 @@ impl<F> Transport<TangleAddress, TangleMessage<F>> for Client {
     }
 }
 
-#[cfg(feature = "async")]
+#[cfg(not(feature = "sync-client"))]
 #[async_trait(?Send)]
 impl<F> Transport<TangleAddress, TangleMessage<F>> for Client
 where
@@ -318,7 +324,7 @@ where
     }
 }
 
-#[cfg(feature = "async")]
+#[cfg(not(feature = "sync-client"))]
 #[async_trait(?Send)]
 impl TransportDetails<TangleAddress> for Client {
     type Details = Details;
@@ -327,7 +333,7 @@ impl TransportDetails<TangleAddress> for Client {
     }
 }
 
-#[cfg(feature = "async")]
+#[cfg(not(feature = "sync-client"))]
 #[async_trait(?Send)]
 impl TransportDetails<TangleAddress> for Rc<RefCell<Client>> {
     type Details = Details;
@@ -340,7 +346,7 @@ impl TransportDetails<TangleAddress> for Rc<RefCell<Client>> {
 }
 
 // It's safe to impl async trait for Rc<RefCell<T>> targeting wasm as it's single-threaded.
-#[cfg(feature = "async")]
+#[cfg(not(feature = "sync-client"))]
 #[async_trait(?Send)]
 impl<F> Transport<TangleAddress, TangleMessage<F>> for Rc<RefCell<Client>>
 where

@@ -2,22 +2,22 @@ use iota_streams_core::Result;
 
 use core::cell::RefCell;
 
-#[cfg(feature = "async")]
-use async_trait::async_trait;
-#[cfg(feature = "async")]
+#[cfg(not(feature = "sync-client"))]
+use iota_streams_core::async_trait;
+#[cfg(not(feature = "sync-client"))]
 use atomic_refcell::AtomicRefCell;
-#[cfg(feature = "async")]
+#[cfg(not(feature = "sync-client"))]
 use core::marker::{
     Send,
     Sync,
 };
-#[cfg(feature = "async")]
+#[cfg(not(feature = "sync-client"))]
 use iota_streams_core::prelude::{
     Arc,
     Box,
 };
 
-#[cfg(not(feature = "async"))]
+#[cfg(feature = "sync-client")]
 use iota_streams_core::prelude::ToString;
 
 use iota_streams_core::prelude::{
@@ -25,13 +25,13 @@ use iota_streams_core::prelude::{
     Vec,
 };
 
-#[cfg(not(feature = "async"))]
+#[cfg(feature = "sync-client")]
 pub trait TransportDetails<Link> {
     type Details;
     fn get_link_details(&mut self, link: &Link) -> Result<Self::Details>;
 }
 
-#[cfg(feature = "async")]
+#[cfg(not(feature = "sync-client"))]
 #[async_trait(?Send)]
 pub trait TransportDetails<Link>
 where
@@ -54,7 +54,7 @@ pub trait TransportOptions {
 /// Network transport abstraction.
 /// Parametrized by the type of message links.
 /// Message link is used to identify/locate a message (eg. like URL for HTTP).
-#[cfg(not(feature = "async"))]
+#[cfg(feature = "sync-client")]
 pub trait Transport<Link: Debug + Display, Msg>: TransportOptions + TransportDetails<Link> {
     /// Send a message with default options.
     fn send_message(&mut self, msg: &Msg) -> Result<()>;
@@ -74,7 +74,7 @@ pub trait Transport<Link: Debug + Display, Msg>: TransportOptions + TransportDet
     }
 }
 
-#[cfg(feature = "async")]
+#[cfg(not(feature = "sync-client"))]
 #[async_trait(?Send)]
 pub trait Transport<Link, Msg>: TransportOptions + TransportDetails<Link>
 where
@@ -119,7 +119,7 @@ impl<Tsp: TransportOptions> TransportOptions for Rc<RefCell<Tsp>> {
     }
 }
 
-#[cfg(not(feature = "async"))]
+#[cfg(feature = "sync-client")]
 impl<Tsp: TransportDetails<Link>, Link> TransportDetails<Link> for Rc<RefCell<Tsp>> {
     type Details = <Tsp as TransportDetails<Link>>::Details;
     fn get_link_details(&mut self, link: &Link) -> Result<Self::Details> {
@@ -127,7 +127,7 @@ impl<Tsp: TransportDetails<Link>, Link> TransportDetails<Link> for Rc<RefCell<Ts
     }
 }
 
-#[cfg(not(feature = "async"))]
+#[cfg(feature = "sync-client")]
 impl<Link: Debug + Display, Msg, Tsp: Transport<Link, Msg>> Transport<Link, Msg> for Rc<RefCell<Tsp>> {
     /// Send a message.
     fn send_message(&mut self, msg: &Msg) -> Result<()> {
@@ -154,15 +154,15 @@ impl<Link: Debug + Display, Msg, Tsp: Transport<Link, Msg>> Transport<Link, Msg>
     }
 }
 
-#[cfg(not(feature = "async"))]
+#[cfg(feature = "sync-client")]
 pub type SharedTransport<T> = Rc<RefCell<T>>;
 
-#[cfg(not(feature = "async"))]
+#[cfg(feature = "sync-client")]
 pub fn new_shared_transport<T>(tsp: T) -> Rc<RefCell<T>> {
     Rc::new(RefCell::new(tsp))
 }
 
-#[cfg(feature = "async")]
+#[cfg(not(feature = "sync-client"))]
 impl<Tsp: TransportOptions> TransportOptions for Arc<AtomicRefCell<Tsp>> {
     type SendOptions = <Tsp as TransportOptions>::SendOptions;
     fn get_send_options(&self) -> Self::SendOptions {
@@ -182,7 +182,7 @@ impl<Tsp: TransportOptions> TransportOptions for Arc<AtomicRefCell<Tsp>> {
 }
 
 // The impl below is too restrictive: Link and Msg require 'async_trait life-time, Tsp is Sync + Send.
-// #[cfg(feature = "async")]
+// #[cfg(not(feature = "sync-client"))]
 // #[async_trait]
 // impl<Link, Msg, Tsp: Transport<Link, Msg>> Transport<Link, Msg> for Arc<AtomicRefCell<Tsp>> where
 // Link: 'static + core::marker::Send + core::marker::Sync,
@@ -205,10 +205,10 @@ impl<Tsp: TransportOptions> TransportOptions for Arc<AtomicRefCell<Tsp>> {
 // }
 // }
 
-#[cfg(feature = "async")]
+#[cfg(not(feature = "sync-client"))]
 pub type SharedTransport<T> = Arc<AtomicRefCell<T>>;
 
-#[cfg(feature = "async")]
+#[cfg(not(feature = "sync-client"))]
 pub fn new_shared_transport<T>(tsp: T) -> Arc<AtomicRefCell<T>> {
     Arc::new(AtomicRefCell::new(tsp))
 }
@@ -216,7 +216,7 @@ pub fn new_shared_transport<T>(tsp: T) -> Arc<AtomicRefCell<T>> {
 mod bucket;
 pub use bucket::BucketTransport;
 
-#[cfg(not(feature = "async"))]
+#[cfg(feature = "sync-client")]
 use core::fmt::{
     Debug,
     Display,
@@ -224,7 +224,7 @@ use core::fmt::{
 
 use iota_streams_core::try_or;
 
-#[cfg(not(feature = "async"))]
+#[cfg(feature = "sync-client")]
 use iota_streams_core::{
     err,
     wrapped_err,

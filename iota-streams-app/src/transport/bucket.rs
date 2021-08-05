@@ -11,8 +11,12 @@ use iota_streams_core::{
     Errors::MessageLinkNotFound,
 };
 
-#[cfg(feature = "async")]
-use iota_streams_core::Errors::MessageNotUnique;
+#[cfg(not(feature = "sync-client"))]
+use iota_streams_core::{
+    async_trait,
+    Errors::MessageNotUnique,
+    prelude::Box,
+};
 
 #[derive(Clone)]
 pub struct BucketTransport<Link, Msg> {
@@ -47,7 +51,7 @@ impl<Link, Msg> TransportOptions for BucketTransport<Link, Msg> {
     fn set_recv_options(&mut self, _opt: ()) {}
 }
 
-#[cfg(not(feature = "async"))]
+#[cfg(feature = "sync-client")]
 impl<Link, Msg> TransportDetails<Link> for BucketTransport<Link, Msg> {
     type Details = ();
     fn get_link_details(&mut self, _opt: &Link) -> Result<Self::Details> {
@@ -55,7 +59,7 @@ impl<Link, Msg> TransportDetails<Link> for BucketTransport<Link, Msg> {
     }
 }
 
-#[cfg(not(feature = "async"))]
+#[cfg(feature = "sync-client")]
 impl<Link, Msg> Transport<Link, Msg> for BucketTransport<Link, Msg>
 where
     Link: Eq + hash::Hash + Clone + core::fmt::Debug + core::fmt::Display,
@@ -80,7 +84,7 @@ where
     }
 }
 
-#[cfg(feature = "async")]
+#[cfg(not(feature = "sync-client"))]
 #[async_trait(?Send)]
 impl<Link, Msg> Transport<Link, Msg> for BucketTransport<Link, Msg>
 where
@@ -116,7 +120,7 @@ where
     }
 }
 
-#[cfg(feature = "async")]
+#[cfg(not(feature = "sync-client"))]
 #[async_trait(?Send)]
 impl<Link, Msg> TransportDetails<Link> for BucketTransport<Link, Msg>
 where
