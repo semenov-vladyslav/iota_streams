@@ -27,6 +27,9 @@ use iota_streams::{
     },
 };
 
+#[cfg(not(feature = "sync-client"))]
+use iota_streams::core::futures::executor::block_on;
+
 use core::ptr::{
     null,
     null_mut,
@@ -144,7 +147,15 @@ pub extern "C" fn drop_unwrapped_messages(ms: *const UnwrappedMessages) {
 pub type TransportWrap = iota_streams::app::transport::tangle::client::Client;
 
 #[cfg(not(feature = "sync-client"))]
-pub type TransportWrap = Rc<core::cell::RefCell<BucketTransport>>;
+pub type TransportWrap = Arc<Mutex<BucketTransport>>;
+
+pub fn run_async<R>(fut: impl Future<Output=R>) -> R {
+    #[cfg(feature = "sync-client")]
+    let ret = tokio::runtime::Runtime::new().unwrap().block_on(fut);
+    #[cfg(not(feature = "sync-client"))]
+    let ret = block_on(fut);
+    ret
+}
 
 #[no_mangle]
 pub extern "C" fn transport_new() -> *mut TransportWrap {
@@ -328,7 +339,7 @@ mod client_details {
         r.as_mut().map_or(Err::NullArgument, |r| {
             tsp.as_mut().map_or(Err::NullArgument, |tsp| {
                 link.as_ref().map_or(Err::NullArgument, |link| {
-                    tsp.get_link_details(link).map_or(Err::OperationFailed, |d| {
+                    run_async(tsp.get_link_details(link)).map_or(Err::OperationFailed, |d| {
                         *r = d.into();
                         Err::Ok
                     })
@@ -605,3 +616,4 @@ pub use auth::*;
 
 mod sub;
 pub use sub::*;
+use core::future::Future;

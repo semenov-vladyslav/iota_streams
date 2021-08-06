@@ -5,9 +5,9 @@ authors = ["Vlad Semenov <vlad.semenov@iota.org>", "Dyrell Chapman <dyrell.chapm
 edition = "2018"
 
 [features]
-default = ["std", "sync-client"]
-std = ["iota-streams/std"]
-sync-client = ["iota-streams/sync-client"]
+default = ["std", "iota-streams/async-client"]
+std = ["iota-streams/std", "iota-streams/async-client"]
+sync-client = ["iota-streams/async-client", "tokio"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
@@ -16,5 +16,6 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 
 [dependencies]
 iota-streams = {path = "../../", default-features = false, features = ["tangle"]}
+tokio = {version = "1.9.0", optional = true}
 
 hex = "0.4"
