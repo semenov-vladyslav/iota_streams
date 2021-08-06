@@ -41,6 +41,7 @@ where
     }
 }
 
+#[cfg(feature = "sync-client")]
 impl<Link, Msg> TransportOptions for BucketTransport<Link, Msg> {
     type SendOptions = ();
     fn get_send_options(&self) {}
@@ -85,7 +86,20 @@ where
 }
 
 #[cfg(not(feature = "sync-client"))]
-#[async_trait(?Send)]
+#[async_trait]
+impl<Link: Send + Sync, Msg: Send + Sync> TransportOptions for BucketTransport<Link, Msg> {
+    type SendOptions = ();
+    async fn get_send_options(&self) {}
+    async fn set_send_options(&mut self, _opt: ()) {}
+
+    type RecvOptions = ();
+    async fn get_recv_options(&self) {}
+    async fn set_recv_options(&mut self, _opt: ()) {}
+}
+
+
+#[cfg(not(feature = "sync-client"))]
+#[async_trait]
 impl<Link, Msg> Transport<Link, Msg> for BucketTransport<Link, Msg>
 where
     Link: Eq + hash::Hash + Clone + core::marker::Send + core::marker::Sync + core::fmt::Display,
@@ -121,10 +135,11 @@ where
 }
 
 #[cfg(not(feature = "sync-client"))]
-#[async_trait(?Send)]
+#[async_trait]
 impl<Link, Msg> TransportDetails<Link> for BucketTransport<Link, Msg>
 where
     Link: Eq + hash::Hash + Clone + core::marker::Send + core::marker::Sync + core::fmt::Display,
+    Msg: Send + Sync,
 {
     type Details = ();
     async fn get_link_details(&mut self, _opt: &Link) -> Result<Self::Details> {

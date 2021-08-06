@@ -8,7 +8,6 @@ edition = "2018"
 default = ["tangle"]
 # enable std
 std = ["iota-streams/std", "hex/std"]
-async = ["iota-streams/async"]
 tangle = ["iota-streams/tangle"]
 
 [dependencies]

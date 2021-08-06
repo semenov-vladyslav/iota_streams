@@ -1,13 +1,8 @@
-#[cfg(not(feature = "sync-client"))]
-use core::cell::RefCell;
 use core::fmt;
 #[cfg(not(feature = "sync-client"))]
 use iota_streams_core::{
     async_trait,
-    prelude::{
-        Box,
-        Rc,
-    }
+    prelude::Box,
 };
 
 pub use iota_client;
@@ -259,6 +254,9 @@ impl Clone for Client {
     }
 }
 
+// Sync Clients
+
+#[cfg(feature = "sync-client")]
 impl TransportOptions for Client {
     type SendOptions = SendOptions;
     fn get_send_options(&self) -> SendOptions {
@@ -297,8 +295,30 @@ impl<F> Transport<TangleAddress, TangleMessage<F>> for Client {
     }
 }
 
+
+// Async Clients
+
 #[cfg(not(feature = "sync-client"))]
-#[async_trait(?Send)]
+#[async_trait]
+impl TransportOptions for Client {
+    type SendOptions = SendOptions;
+    async fn get_send_options(&self) -> SendOptions {
+        self.send_opt.clone()
+    }
+    async fn set_send_options(&mut self, opt: SendOptions) {
+        self.send_opt = opt;
+
+        // TODO
+        // self.client.set_send_options()
+    }
+
+    type RecvOptions = ();
+    async fn get_recv_options(&self) {}
+    async fn set_recv_options(&mut self, _opt: ()) {}
+}
+
+#[cfg(not(feature = "sync-client"))]
+#[async_trait]
 impl<F> Transport<TangleAddress, TangleMessage<F>> for Client
 where
     F: 'static + core::marker::Send + core::marker::Sync,
@@ -325,61 +345,10 @@ where
 }
 
 #[cfg(not(feature = "sync-client"))]
-#[async_trait(?Send)]
+#[async_trait]
 impl TransportDetails<TangleAddress> for Client {
     type Details = Details;
     async fn get_link_details(&mut self, link: &TangleAddress) -> Result<Self::Details> {
         async_get_link_details(&self.client, link).await
-    }
-}
-
-#[cfg(not(feature = "sync-client"))]
-#[async_trait(?Send)]
-impl TransportDetails<TangleAddress> for Rc<RefCell<Client>> {
-    type Details = Details;
-    async fn get_link_details(&mut self, link: &TangleAddress) -> Result<Self::Details> {
-        match (&*self).try_borrow_mut() {
-            Ok(tsp) => async_get_link_details(&tsp.client, link).await,
-            Err(err) => Err(wrapped_err!(TransportNotAvailable, WrappedError(err))),
-        }
-    }
-}
-
-// It's safe to impl async trait for Rc<RefCell<T>> targeting wasm as it's single-threaded.
-#[cfg(not(feature = "sync-client"))]
-#[async_trait(?Send)]
-impl<F> Transport<TangleAddress, TangleMessage<F>> for Rc<RefCell<Client>>
-where
-    F: 'static + core::marker::Send + core::marker::Sync,
-{
-    /// Send a Streams message over the Tangle with the current timestamp and default SendOptions.
-    async fn send_message(&mut self, msg: &TangleMessage<F>) -> Result<()> {
-        match (&*self).try_borrow_mut() {
-            Ok(tsp) => async_send_message_with_options(&tsp.client, msg).await,
-            Err(_err) => err!(TransportNotAvailable),
-        }
-    }
-
-    /// Receive a message.
-    async fn recv_messages(&mut self, link: &TangleAddress) -> Result<Vec<TangleMessage<F>>> {
-        match (&*self).try_borrow_mut() {
-            Ok(tsp) => async_recv_messages(&tsp.client, link).await,
-            Err(_err) => err!(TransportNotAvailable),
-        }
-    }
-
-    async fn recv_message(&mut self, link: &TangleAddress) -> Result<TangleMessage<F>> {
-        match (&*self).try_borrow_mut() {
-            Ok(tsp) => {
-                let mut msgs = async_recv_messages(&tsp.client, link).await?;
-                if let Some(msg) = msgs.pop() {
-                    try_or!(msgs.is_empty(), MessageNotUnique(link.msgid.to_string()))?;
-                    Ok(msg)
-                } else {
-                    err!(MessageLinkNotFound(link.msgid.to_string()))
-                }
-            }
-            Err(_err) => err!(TransportNotAvailable),
-        }
     }
 }

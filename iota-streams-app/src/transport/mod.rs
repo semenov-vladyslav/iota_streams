@@ -1,11 +1,11 @@
 use iota_streams_core::Result;
 
+#[cfg(feature = "sync-client")]
 use core::cell::RefCell;
 
 #[cfg(not(feature = "sync-client"))]
 use iota_streams_core::async_trait;
-#[cfg(not(feature = "sync-client"))]
-use atomic_refcell::AtomicRefCell;
+
 #[cfg(not(feature = "sync-client"))]
 use core::marker::{
     Send,
@@ -14,16 +14,14 @@ use core::marker::{
 #[cfg(not(feature = "sync-client"))]
 use iota_streams_core::prelude::{
     Arc,
+    Mutex,
     Box,
 };
 
 #[cfg(feature = "sync-client")]
-use iota_streams_core::prelude::ToString;
+use iota_streams_core::prelude::{Rc, ToString};
 
-use iota_streams_core::prelude::{
-    Rc,
-    Vec,
-};
+use iota_streams_core::prelude::Vec;
 
 #[cfg(feature = "sync-client")]
 pub trait TransportDetails<Link> {
@@ -32,7 +30,7 @@ pub trait TransportDetails<Link> {
 }
 
 #[cfg(not(feature = "sync-client"))]
-#[async_trait(?Send)]
+#[async_trait]
 pub trait TransportDetails<Link>
 where
     Link: Send + Sync,
@@ -41,6 +39,7 @@ where
     async fn get_link_details(&mut self, link: &Link) -> Result<Self::Details>;
 }
 
+#[cfg(feature = "sync-client")]
 pub trait TransportOptions {
     type SendOptions;
     fn get_send_options(&self) -> Self::SendOptions;
@@ -50,6 +49,19 @@ pub trait TransportOptions {
     fn get_recv_options(&self) -> Self::RecvOptions;
     fn set_recv_options(&mut self, opt: Self::RecvOptions);
 }
+
+#[cfg(not(feature = "sync-client"))]
+#[async_trait]
+pub trait TransportOptions: Send + Sync {
+    type SendOptions;
+    async fn get_send_options(&self) -> Self::SendOptions;
+    async fn set_send_options(&mut self, opt: Self::SendOptions);
+
+    type RecvOptions;
+    async fn get_recv_options(&self) -> Self::RecvOptions;
+    async fn set_recv_options(&mut self, opt: Self::RecvOptions);
+}
+
 
 /// Network transport abstraction.
 /// Parametrized by the type of message links.
@@ -75,8 +87,8 @@ pub trait Transport<Link: Debug + Display, Msg>: TransportOptions + TransportDet
 }
 
 #[cfg(not(feature = "sync-client"))]
-#[async_trait(?Send)]
-pub trait Transport<Link, Msg>: TransportOptions + TransportDetails<Link>
+#[async_trait]
+pub trait Transport<Link, Msg>: TransportOptions + TransportDetails<Link> + Send + Sync
 where
     Link: Send + Sync,
     Msg: Send + Sync,
@@ -101,6 +113,7 @@ where
     // }
 }
 
+#[cfg(feature = "sync-client")]
 impl<Tsp: TransportOptions> TransportOptions for Rc<RefCell<Tsp>> {
     type SendOptions = <Tsp as TransportOptions>::SendOptions;
     fn get_send_options(&self) -> Self::SendOptions {
@@ -163,54 +176,74 @@ pub fn new_shared_transport<T>(tsp: T) -> Rc<RefCell<T>> {
 }
 
 #[cfg(not(feature = "sync-client"))]
-impl<Tsp: TransportOptions> TransportOptions for Arc<AtomicRefCell<Tsp>> {
+#[async_trait]
+impl<Tsp: TransportOptions + Send + Sync> TransportOptions for Arc<Mutex<Tsp>>
+where
+    <Tsp as TransportOptions>::SendOptions: Send + Sync,
+    <Tsp as TransportOptions>::RecvOptions: Send + Sync,
+{
     type SendOptions = <Tsp as TransportOptions>::SendOptions;
-    fn get_send_options(&self) -> Self::SendOptions {
-        (&*self).borrow().get_send_options()
+    async fn get_send_options(&self) -> Self::SendOptions {
+        (&*self).lock().await.get_send_options().await
     }
-    fn set_send_options(&mut self, opt: Self::SendOptions) {
-        (&*self).borrow_mut().set_send_options(opt)
+    async fn set_send_options(&mut self, opt: Self::SendOptions) {
+        (&*self).lock().await.set_send_options(opt).await
     }
 
     type RecvOptions = <Tsp as TransportOptions>::RecvOptions;
-    fn get_recv_options(&self) -> Self::RecvOptions {
-        (&*self).borrow().get_recv_options()
+    async fn get_recv_options(&self) -> Self::RecvOptions {
+        (&*self).lock().await.get_recv_options().await
     }
-    fn set_recv_options(&mut self, opt: Self::RecvOptions) {
-        (&*self).borrow_mut().set_recv_options(opt)
+    async fn set_recv_options(&mut self, opt: Self::RecvOptions) {
+        (&*self).lock().await.set_recv_options(opt).await
+    }
+}
+
+#[cfg(not(feature = "sync-client"))]
+#[async_trait]
+impl<Link, Tsp: TransportDetails<Link> + Send + Sync> TransportDetails<Link> for Arc<Mutex<Tsp>>
+where
+    Link: 'static + core::marker::Send + core::marker::Sync,
+{
+    type Details = <Tsp as TransportDetails<Link>>::Details;
+    async fn get_link_details(&mut self, link: &Link) -> Result<Self::Details> {
+        (&*self).lock().await.get_link_details(link).await
     }
 }
 
 // The impl below is too restrictive: Link and Msg require 'async_trait life-time, Tsp is Sync + Send.
-// #[cfg(not(feature = "sync-client"))]
-// #[async_trait]
-// impl<Link, Msg, Tsp: Transport<Link, Msg>> Transport<Link, Msg> for Arc<AtomicRefCell<Tsp>> where
-// Link: 'static + core::marker::Send + core::marker::Sync,
-// Msg: 'static + core::marker::Send + core::marker::Sync,
-// Tsp: core::marker::Send + core::marker::Sync,
-// {
-// Send a message.
-// async fn send_message(&mut self, msg: &Msg) -> Result<()> {
-// (&*self).borrow_mut().send_message(msg).await
-// }
-//
-// Receive messages with default options.
-// async fn recv_messages(&mut self, link: &Link) -> Result<Vec<Msg>> {
-// (&*self).borrow_mut().recv_messages(link).await
-// }
-//
-// Receive a message with default options.
-// async fn recv_message(&mut self, link: &Link) -> Result<Msg> {
-// (&*self).borrow_mut().recv_message(link).await
-// }
-// }
+#[cfg(not(feature = "sync-client"))]
+#[async_trait]
+impl<Link, Msg, Tsp: Transport<Link, Msg> + Send + Sync> Transport<Link, Msg> for Arc<Mutex<Tsp>>
+where
+    Link: 'static + core::marker::Send + core::marker::Sync,
+    Msg: 'static + core::marker::Send + core::marker::Sync,
+    Tsp: core::marker::Send + core::marker::Sync,
+    <Tsp as TransportOptions>::SendOptions: Send + Sync,
+    <Tsp as TransportOptions>::RecvOptions: Send + Sync,
+{
+    // Send a message.
+    async fn send_message(&mut self, msg: &Msg) -> Result<()> {
+        (&*self).lock().await.send_message(msg).await
+    }
+
+    // Receive messages with default options.
+    async fn recv_messages(&mut self, link: &Link) -> Result<Vec<Msg>> {
+        (&*self).lock().await.recv_messages(link).await
+    }
+
+    // Receive a message with default options.
+    async fn recv_message(&mut self, link: &Link) -> Result<Msg> {
+        (&*self).lock().await.recv_message(link).await
+    }
+}
 
 #[cfg(not(feature = "sync-client"))]
-pub type SharedTransport<T> = Arc<AtomicRefCell<T>>;
+pub type SharedTransport<T> = Arc<Mutex<T>>;
 
 #[cfg(not(feature = "sync-client"))]
-pub fn new_shared_transport<T>(tsp: T) -> Arc<AtomicRefCell<T>> {
-    Arc::new(AtomicRefCell::new(tsp))
+pub fn new_shared_transport<T>(tsp: T) -> Arc<Mutex<T>> {
+    Arc::new(Mutex::new(tsp))
 }
 
 mod bucket;
