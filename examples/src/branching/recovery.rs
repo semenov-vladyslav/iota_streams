@@ -7,14 +7,11 @@ use iota_streams::{
     },
     core::{
         panic_if_not,
-        prelude::Rc,
         println,
         Result,
     },
     ddml::types::*,
 };
-
-use core::cell::RefCell;
 
 use super::utils;
 use std::{
@@ -22,7 +19,7 @@ use std::{
     time::Duration,
 };
 
-pub async fn example<T: Transport>(transport: Rc<RefCell<T>>, channel_type: ChannelType, seed: &str) -> Result<()> {
+pub async fn example<T: Transport>(transport: T, channel_type: ChannelType, seed: &str) -> Result<()> {
     let mut author = Author::new(seed, channel_type.clone(), transport.clone());
     println!("Author multi branching?: {}", author.is_multi_branching());
 

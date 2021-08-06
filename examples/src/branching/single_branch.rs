@@ -12,7 +12,7 @@ use iota_streams::{
     },
     core::{
         panic_if_not,
-        prelude::{HashMap, Rc},
+        prelude::HashMap,
         print,
         println,
         try_or,
@@ -22,11 +22,9 @@ use iota_streams::{
     ddml::types::*,
 };
 
-use core::cell::RefCell;
-
 use super::utils;
 
-pub async fn example<T: Transport>(transport: Rc<RefCell<T>>, channel_impl: ChannelType, seed: &str) -> Result<()> {
+pub async fn example<T: Transport>(transport: T, channel_impl: ChannelType, seed: &str) -> Result<()> {
     let mut author = Author::new(seed, channel_impl, transport.clone());
     println!("Author multi branching?: {}", author.is_multi_branching());
 
