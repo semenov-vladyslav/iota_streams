@@ -14,8 +14,8 @@ use iota_streams_core::{
 #[cfg(not(feature = "sync-client"))]
 use iota_streams_core::{
     async_trait,
-    Errors::MessageNotUnique,
     prelude::Box,
+    Errors::MessageNotUnique,
 };
 
 #[derive(Clone)]
@@ -96,7 +96,6 @@ impl<Link: Send + Sync, Msg: Send + Sync> TransportOptions for BucketTransport<L
     async fn get_recv_options(&self) {}
     async fn set_recv_options(&mut self, _opt: ()) {}
 }
-
 
 #[cfg(not(feature = "sync-client"))]
 #[async_trait]

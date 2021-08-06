@@ -185,7 +185,7 @@ impl<Trans> User<Trans> {
 
 impl<Trans: Transport + Clone> User<Trans> {
     // Send
-    
+
     async fn transport_send(&mut self, msg: &Message) -> Result<()> {
         #[cfg(feature = "sync-client")]
         self.transport.send_message(msg)?;
@@ -330,7 +330,11 @@ impl<Trans: Transport + Clone> User<Trans> {
     pub async fn receive_sequence(&mut self, link: &Address) -> Result<Address> {
         let msg = self.transport_recv(link).await?;
         if let Some(_addr) = &self.user.appinst {
-            let seq_msg = self.user.handle_sequence(msg.binary, MsgInfo::Sequence, true).await?.body;
+            let seq_msg = self
+                .user
+                .handle_sequence(msg.binary, MsgInfo::Sequence, true)
+                .await?
+                .body;
             let msg_id = self.user.link_gen.link_from(
                 &seq_msg.id,
                 Cursor::new_at(&seq_msg.ref_link, 0, seq_msg.seq_num.0 as u32),
@@ -349,7 +353,10 @@ impl<Trans: Transport + Clone> User<Trans> {
     pub async fn receive_signed_packet(&mut self, link: &Address) -> Result<(PublicKey, Bytes, Bytes)> {
         let msg = self.transport_recv(link).await?;
         // TODO: msg.timestamp is lost
-        let m = self.user.handle_signed_packet(msg.binary, MsgInfo::SignedPacket).await?;
+        let m = self
+            .user
+            .handle_signed_packet(msg.binary, MsgInfo::SignedPacket)
+            .await?;
         Ok(m.body)
     }
 
@@ -359,7 +366,10 @@ impl<Trans: Transport + Clone> User<Trans> {
     ///  * `link` - Address of the message to be processed
     pub async fn receive_tagged_packet(&mut self, link: &Address) -> Result<(Bytes, Bytes)> {
         let msg = self.transport_recv(link).await?;
-        let m = self.user.handle_tagged_packet(msg.binary, MsgInfo::TaggedPacket).await?;
+        let m = self
+            .user
+            .handle_tagged_packet(msg.binary, MsgInfo::TaggedPacket)
+            .await?;
         Ok(m.body)
     }
 

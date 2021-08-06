@@ -14,7 +14,7 @@ where
     C: for<'a> FnMut(&'a mut Self, <I as iter::Iterator>::Item) -> Result<&'a mut Self>,
 {
     fn repeated(&mut self, values_iter: I, mut value_handle: C) -> Result<&mut Self> {
-          values_iter.fold(Ok(self), |rctx, item| -> Result<&mut Self> {
+        values_iter.fold(Ok(self), |rctx, item| -> Result<&mut Self> {
             match rctx {
                 Ok(ctx) => value_handle(ctx, item),
                 Err(e) => Err(e),

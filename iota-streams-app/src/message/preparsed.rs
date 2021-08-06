@@ -3,9 +3,11 @@ use iota_streams_core::Result;
 use core::fmt;
 
 use super::*;
-use iota_streams_core::sponge::prp::PRP;
+use iota_streams_core::{
+    prelude::MutexGuard,
+    sponge::prp::PRP,
+};
 use iota_streams_ddml::command::unwrap;
-use iota_streams_core::prelude::MutexGuard;
 
 /// Message context preparsed for unwrapping.
 pub struct PreparsedMessage<'a, F, Link: Default> {

@@ -59,7 +59,9 @@ pub async fn example<T: Transport + Clone>(transport: T) -> Result<()> {
 
     println!("\nsign packet");
     let signed_packet_link = {
-        let (msg, _) = author.send_signed_packet(&announcement_link, &public_payload, &masked_payload).await?;
+        let (msg, _) = author
+            .send_signed_packet(&announcement_link, &public_payload, &masked_payload)
+            .await?;
         println!("  {}", msg);
         msg
     };
@@ -105,7 +107,9 @@ pub async fn example<T: Transport + Clone>(transport: T) -> Result<()> {
 
     println!("\ntag packet");
     let tagged_packet_link = {
-        let (msg, _) = author.send_tagged_packet(&keyload_link, &public_payload, &masked_payload).await?;
+        let (msg, _) = author
+            .send_tagged_packet(&keyload_link, &public_payload, &masked_payload)
+            .await?;
         println!("  {}", msg);
         msg
     };
@@ -123,17 +127,22 @@ pub async fn example<T: Transport + Clone>(transport: T) -> Result<()> {
     }
 
     let subAdump = subscriberA.export("pwdSubA").await.unwrap();
-    let _subscriberA2 = Subscriber::import(subAdump.as_ref(), "pwdSubA", transport.clone()).await.unwrap();
+    let _subscriberA2 = Subscriber::import(subAdump.as_ref(), "pwdSubA", transport.clone())
+        .await
+        .unwrap();
 
     let subBdump = subscriberB.export("pwdSubB").await.unwrap();
-    let _subscriberB2 = Subscriber::import(subBdump.as_ref(), "pwdSubB", transport.clone()).await.unwrap();
+    let _subscriberB2 = Subscriber::import(subBdump.as_ref(), "pwdSubB", transport.clone())
+        .await
+        .unwrap();
 
     let authordump = author.export("pwdAuthor").await.unwrap();
-    let _author2 = Author::import(authordump.as_ref(), "pwdAuthor", transport).await.unwrap();
+    let _author2 = Author::import(authordump.as_ref(), "pwdAuthor", transport)
+        .await
+        .unwrap();
 
     Ok(())
 }
-
 
 #[test]
 fn run_basic_scenario() {

@@ -2,13 +2,13 @@ use iota_streams_core::Result;
 
 use super::*;
 use iota_streams_core::{
+    prelude::MutexGuard,
     sponge::{
         prp::PRP,
         spongos::Spongos,
-    }
+    },
 };
 use iota_streams_ddml::link_store::LinkStore;
-use iota_streams_core::prelude::MutexGuard;
 
 /// Result of wrapping the message.
 pub struct UnwrappedMessage<F, Link, Content> {

@@ -2,6 +2,10 @@ use iota_streams_core::Result;
 
 use super::*;
 use iota_streams_core::{
+    prelude::{
+        Arc,
+        Mutex,
+    },
     sponge::prp::PRP,
     try_or,
     Errors::OutputStreamNotFullyConsumed,
@@ -14,7 +18,6 @@ use iota_streams_ddml::{
     link_store::LinkStore,
     types::*,
 };
-use iota_streams_core::prelude::{Mutex, Arc};
 
 /// Message context prepared for wrapping.
 pub struct PreparedMessage<'a, F, Link: Default, Store: 'a, Content> {

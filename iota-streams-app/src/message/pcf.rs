@@ -133,7 +133,7 @@ impl<F, Content, Store> ContentWrap<F, Store> for PCF<Content>
 where
     F: PRP,
     Content: ContentWrap<F, Store> + Send + Sync,
-    Store: Send + Sync
+    Store: Send + Sync,
 {
     async fn wrap<'c, OS: io::OStream + Send + Sync>(
         &self,

@@ -2,7 +2,7 @@ use core::fmt;
 use iota_streams_core::{
     async_trait,
     prelude::Box,
-    Result
+    Result,
 };
 
 use iota_streams_core::{

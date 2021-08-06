@@ -2,8 +2,8 @@ use iota_streams_core::{
     async_trait,
     err,
     prelude::{
-        Box,
         digest::generic_array::GenericArray,
+        Box,
         Vec,
     },
     psk::{

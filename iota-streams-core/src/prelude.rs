@@ -48,7 +48,10 @@ pub use std::{
     },
 };
 
-pub use futures::lock::{Mutex, MutexGuard};
+pub use futures::lock::{
+    Mutex,
+    MutexGuard,
+};
 
 pub use hashbrown::{
     hash_map,

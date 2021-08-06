@@ -14,12 +14,15 @@ use core::marker::{
 #[cfg(not(feature = "sync-client"))]
 use iota_streams_core::prelude::{
     Arc,
-    Mutex,
     Box,
+    Mutex,
 };
 
 #[cfg(feature = "sync-client")]
-use iota_streams_core::prelude::{Rc, ToString};
+use iota_streams_core::prelude::{
+    Rc,
+    ToString,
+};
 
 use iota_streams_core::prelude::Vec;
 
@@ -61,7 +64,6 @@ pub trait TransportOptions: Send + Sync {
     async fn get_recv_options(&self) -> Self::RecvOptions;
     async fn set_recv_options(&mut self, opt: Self::RecvOptions);
 }
-
 
 /// Network transport abstraction.
 /// Parametrized by the type of message links.

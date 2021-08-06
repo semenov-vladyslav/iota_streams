@@ -31,8 +31,8 @@ use iota_streams_app::message::{
 use iota_streams_core::{
     async_trait,
     prelude::{
-        Box,
         typenum::Unsigned as _,
+        Box,
     },
     sponge::{
         prp::PRP,

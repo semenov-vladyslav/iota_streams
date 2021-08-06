@@ -151,7 +151,9 @@ impl<Trans> Subscriber<Trans> {
     ///   * `pwd` - Encryption password
     ///   * `tsp` - Transport object
     pub async fn import(bytes: &[u8], pwd: &str, tsp: Trans) -> Result<Self> {
-        User::<Trans>::import(bytes, 1, pwd, tsp).await.map(|user| Self { user })
+        User::<Trans>::import(bytes, 1, pwd, tsp)
+            .await
+            .map(|user| Self { user })
     }
 }
 

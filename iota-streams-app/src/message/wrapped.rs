@@ -2,12 +2,14 @@ use core::fmt;
 use iota_streams_core::Result;
 
 use super::*;
-use iota_streams_core::sponge::{
-    prp::PRP,
-    spongos::Spongos,
+use iota_streams_core::{
+    prelude::MutexGuard,
+    sponge::{
+        prp::PRP,
+        spongos::Spongos,
+    },
 };
 use iota_streams_ddml::link_store::LinkStore;
-use iota_streams_core::prelude::MutexGuard;
 
 /// Spongos state and representative Link identifier
 pub struct WrapState<F, Link> {

@@ -295,7 +295,6 @@ impl<F> Transport<TangleAddress, TangleMessage<F>> for Client {
     }
 }
 
-
 // Async Clients
 
 #[cfg(not(feature = "sync-client"))]
