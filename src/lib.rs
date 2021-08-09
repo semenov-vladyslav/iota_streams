@@ -22,6 +22,8 @@
 //! - `iota_streams_ddml`: Modules for working with
 //! the IOTA data description language called DDML, in which all Streams messages are encoded
 
+// CORRECTNESS: Channel is not the high-level API of Streams
+
 #![no_std]
 
 /// Streams Application layer definitions.

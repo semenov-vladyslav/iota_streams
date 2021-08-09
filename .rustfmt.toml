@@ -2,6 +2,7 @@ unstable_features = true
 imports_layout = "Vertical"
 imports_granularity = "Crate"
 comment_width = 120
+# STYLE&CONVENTION: formatting influences content
 max_width = 120
 format_code_in_doc_comments = true
 normalize_comments = true
