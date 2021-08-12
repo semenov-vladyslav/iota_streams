@@ -34,7 +34,7 @@ impl<Link, Msg> BucketTransport<Link, Msg> where Link: Eq + hash::Hash {
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl<Link: Send + Sync, Msg: Send + Sync> TransportOptions for BucketTransport<Link, Msg> {
     type SendOptions = ();
     async fn get_send_options(&self) {}
@@ -45,7 +45,7 @@ impl<Link: Send + Sync, Msg: Send + Sync> TransportOptions for BucketTransport<L
     async fn set_recv_options(&mut self, _opt: ()) {}
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl<Link, Msg> Transport<Link, Msg> for BucketTransport<Link, Msg>
 where
     Link: Eq + hash::Hash + Clone + core::marker::Send + core::marker::Sync + core::fmt::Display,
@@ -80,7 +80,7 @@ where
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl<Link, Msg> TransportDetails<Link> for BucketTransport<Link, Msg>
 where
     Link: Eq + hash::Hash + Clone + core::marker::Send + core::marker::Sync + core::fmt::Display,

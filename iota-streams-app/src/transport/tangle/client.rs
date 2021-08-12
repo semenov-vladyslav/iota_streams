@@ -242,7 +242,7 @@ impl Clone for Client {
 }
 
 // Async Clients
-#[async_trait]
+#[async_trait(?Send)]
 impl TransportOptions for Client {
     type SendOptions = SendOptions;
     async fn get_send_options(&self) -> SendOptions {
@@ -260,7 +260,7 @@ impl TransportOptions for Client {
     async fn set_recv_options(&mut self, _opt: ()) {}
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl<F> Transport<TangleAddress, TangleMessage<F>> for Client
 where
     F: 'static + core::marker::Send + core::marker::Sync,
@@ -286,7 +286,7 @@ where
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl TransportDetails<TangleAddress> for Client {
     type Details = Details;
     async fn get_link_details(&mut self, link: &TangleAddress) -> Result<Self::Details> {

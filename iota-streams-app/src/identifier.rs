@@ -1,23 +1,15 @@
-use iota_streams_core::{
-    async_trait,
-    err,
-    prelude::{
-        digest::generic_array::GenericArray,
-        Box,
-        Vec,
-    },
-    psk::{
-        self,
-        PskId,
-        PSKID_SIZE,
-    },
-    sponge::prp::PRP,
-    Errors::{
-        BadOneof,
-        IdentifierGenerationFailure,
-    },
-    Result,
-};
+use iota_streams_core::{async_trait, err, prelude::{
+    digest::generic_array::GenericArray,
+    Box,
+    Vec,
+}, psk::{
+    self,
+    PskId,
+    PSKID_SIZE,
+}, sponge::prp::PRP, Errors::{
+    BadOneof,
+    IdentifierGenerationFailure,
+}, Result, wrapped_err, WrappedError};
 
 use iota_streams_core_edsig::signature::ed25519;
 
@@ -28,6 +20,7 @@ use iota_streams_ddml::{
 };
 
 use crate::message::*;
+use iota_streams_core::Errors::PublicKeyGenerationFailure;
 
 #[derive(Clone, Copy, Hash, PartialEq, Eq)]
 pub enum Identifier {
@@ -45,7 +38,10 @@ impl Identifier {
 
     pub fn from_bytes(bytes: &[u8]) -> iota_streams_core::Result<Self> {
         match bytes.len() {
-            ed25519::PUBLIC_KEY_LENGTH => Ok(Identifier::EdPubKey(ed25519::PublicKey::from_bytes(bytes)?.into())),
+            ed25519::PUBLIC_KEY_LENGTH => match ed25519::PublicKey::from_bytes(bytes) {
+                Ok(pk) => Ok(Identifier::EdPubKey(pk.into())),
+                Err(e) => Err(wrapped_err(PublicKeyGenerationFailure, WrappedError(e))),
+            },
             PSKID_SIZE => Ok(Identifier::PskId(GenericArray::clone_from_slice(bytes))),
             _ => err(IdentifierGenerationFailure),
         }

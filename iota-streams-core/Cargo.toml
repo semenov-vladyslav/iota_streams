@@ -28,7 +28,7 @@ hashbrown = { version = "0.11.2", default-features = false, optional = false, fe
 hex = { version = "0.4", default-features = false, optional = false, features = ["alloc"] }
 anyhow = { version = "1.0.34", default-features = false, optional = false }
 async-trait = { version = "0.1", optional = false }
-futures = { version = "0.3.8", default-features = false  }
+futures = { version = "0.3.8", default-features = false, features = ["executor"] }
 spin = { version = "0.9.2", default-features = false, features = ["mutex", "spin_mutex"] }
 
 # thiserror = { version = "1.0.22", default-features = false, optional = false }
