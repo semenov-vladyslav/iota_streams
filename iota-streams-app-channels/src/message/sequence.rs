@@ -126,7 +126,7 @@ where
     <Link as HasLink>::Rel: Eq + Default + SkipFallback<F> + AbsorbFallback<F>,
 {
     async fn unwrap<'c, IS: io::IStream + Send + Sync>(
-        &'c mut self,
+        &mut self,
         store: &'c Store,
         ctx: &'c mut unwrap::Context<F, IS>,
     ) -> Result<&'c mut unwrap::Context<F, IS>> {

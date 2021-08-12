@@ -154,7 +154,7 @@ where
     Store: Send + Sync,
 {
     async fn unwrap<'c, IS: io::IStream + Send + Sync>(
-        &'c mut self,
+        &mut self,
         store: &'c Store,
         mut ctx: &'c mut unwrap::Context<F, IS>,
     ) -> Result<&'c mut unwrap::Context<F, IS>> {

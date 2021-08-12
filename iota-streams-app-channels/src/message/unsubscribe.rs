@@ -94,7 +94,7 @@ where
     Store: LinkStore<TW, F, <Link as HasLink>::Rel>,
 {
     fn unwrap<'c, IS: io::IStream<TW>>(
-        &'c mut self,
+        &mut self,
         store: &'c Store,
         ctx: &'c mut unwrap::Context<TW, F, IS>,
     ) -> Result<&'c mut unwrap::Context<TW, F, IS>> {
