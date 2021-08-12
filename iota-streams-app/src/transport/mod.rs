@@ -91,18 +91,18 @@ where
 {
     type SendOptions = <Tsp as TransportOptions>::SendOptions;
     async fn get_send_options(&self) -> Self::SendOptions {
-        (&*self).lock().await.get_send_options().await
+        (&*self).lock().get_send_options().await
     }
     async fn set_send_options(&mut self, opt: Self::SendOptions) {
-        (&*self).lock().await.set_send_options(opt).await
+        (&*self).lock().set_send_options(opt).await
     }
 
     type RecvOptions = <Tsp as TransportOptions>::RecvOptions;
     async fn get_recv_options(&self) -> Self::RecvOptions {
-        (&*self).lock().await.get_recv_options().await
+        (&*self).lock().get_recv_options().await
     }
     async fn set_recv_options(&mut self, opt: Self::RecvOptions) {
-        (&*self).lock().await.set_recv_options(opt).await
+        (&*self).lock().set_recv_options(opt).await
     }
 }
 
@@ -113,7 +113,7 @@ where
 {
     type Details = <Tsp as TransportDetails<Link>>::Details;
     async fn get_link_details(&mut self, link: &Link) -> Result<Self::Details> {
-        (&*self).lock().await.get_link_details(link).await
+        (&*self).lock().get_link_details(link).await
     }
 }
 
@@ -128,17 +128,17 @@ where
 {
     // Send a message.
     async fn send_message(&mut self, msg: &Msg) -> Result<()> {
-        (&*self).lock().await.send_message(msg).await
+        (&*self).lock().send_message(msg).await
     }
 
     // Receive messages with default options.
     async fn recv_messages(&mut self, link: &Link) -> Result<Vec<Msg>> {
-        (&*self).lock().await.recv_messages(link).await
+        (&*self).lock().recv_messages(link).await
     }
 
     // Receive a message with default options.
     async fn recv_message(&mut self, link: &Link) -> Result<Msg> {
-        (&*self).lock().await.recv_message(link).await
+        (&*self).lock().recv_message(link).await
     }
 }
 

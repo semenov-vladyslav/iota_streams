@@ -64,8 +64,8 @@ where
 
         let spongos = {
             let mut ctx = wrap::Context::new(&mut buf[..]);
-            self.header.wrap(&*self.store.lock().await, &mut ctx).await?;
-            self.content.wrap(&*self.store.lock().await, &mut ctx).await?;
+            self.header.wrap(&*self.store.lock(), &mut ctx).await?;
+            self.content.wrap(&*self.store.lock(), &mut ctx).await?;
             try_or!(ctx.stream.is_empty(), OutputStreamNotFullyConsumed(ctx.stream.len()))?;
             ctx.spongos
         };

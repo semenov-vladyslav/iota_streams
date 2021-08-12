@@ -12,7 +12,7 @@ description = "A rust implementation of the IOTA Streams core utils"
 default = ["std"]
 # enable std
 std = ["rand/std", "digest/std", "hex/std"]
-no-std = ["spin"]
+no-std = []
 err-location-log = []
 
 [lib]
@@ -29,7 +29,7 @@ hex = { version = "0.4", default-features = false, optional = false, features = 
 anyhow = { version = "1.0.34", default-features = false, optional = false }
 async-trait = { version = "0.1", optional = false }
 futures = { version = "0.3.8", default-features = false  }
-spin = { version = "0.9.2", default-features = false, features = ["mutex"], optional = true }
+spin = { version = "0.9.2", default-features = false, features = ["mutex", "spin_mutex"] }
 
 # thiserror = { version = "1.0.22", default-features = false, optional = false }
 displaydoc = { version = "0.2", default-features = false, optional = false }
