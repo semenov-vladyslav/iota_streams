@@ -22,13 +22,13 @@ use iota_streams::{
         },
     },
     core::{
+        futures::executor::block_on,
         prelude::{
             Arc,
             Mutex,
             Rc,
             String,
         },
-        futures::executor::block_on,
         psk::pskid_to_hex_string,
     },
     ddml::types::*,

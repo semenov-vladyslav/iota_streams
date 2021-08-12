@@ -1,15 +1,25 @@
-use iota_streams_core::{async_trait, err, prelude::{
-    digest::generic_array::GenericArray,
-    Box,
-    Vec,
-}, psk::{
-    self,
-    PskId,
-    PSKID_SIZE,
-}, sponge::prp::PRP, Errors::{
-    BadOneof,
-    IdentifierGenerationFailure,
-}, Result, wrapped_err, WrappedError};
+use iota_streams_core::{
+    async_trait,
+    err,
+    prelude::{
+        digest::generic_array::GenericArray,
+        Box,
+        Vec,
+    },
+    psk::{
+        self,
+        PskId,
+        PSKID_SIZE,
+    },
+    sponge::prp::PRP,
+    wrapped_err,
+    Errors::{
+        BadOneof,
+        IdentifierGenerationFailure,
+    },
+    Result,
+    WrappedError,
+};
 
 use iota_streams_core_edsig::signature::ed25519;
 

@@ -29,6 +29,7 @@ use iota_streams::{
         },
     },
     core::{
+        futures::executor::block_on,
         prelude::{
             Arc,
             Mutex,
@@ -37,7 +38,6 @@ use iota_streams::{
             ToString,
         },
         psk::pskid_to_hex_string,
-        futures::executor::block_on,
     },
     ddml::types::*,
 };

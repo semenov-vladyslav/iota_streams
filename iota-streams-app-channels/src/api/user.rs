@@ -571,9 +571,7 @@ where
                 for<'c> fn(&'c Self, &Identifier) -> Option<psk::Psk>,
                 for<'c> fn(&'c Self, &Identifier) -> Option<&'c x25519::StaticSecret>,
             >::new(self, Self::lookup_psk, Self::lookup_ke_sk, author_sig_pk);
-            let unwrapped = preparsed
-                .unwrap(&*self.link_store.lock().borrow(), content)
-                .await?;
+            let unwrapped = preparsed.unwrap(&*self.link_store.lock().borrow(), content).await?;
             Ok(unwrapped)
         } else {
             err!(AuthorSigKeyNotFound)
@@ -1043,7 +1041,7 @@ where
     <Link as HasLink>::Rel: Eq + fmt::Debug + SkipFallback<F> + AbsorbFallback<F>,
     LG: LinkGenerator<Link>,
     LS: LinkStore<F, <Link as HasLink>::Rel> + Default,
-    <LS as LinkStore<F, <Link as HasLink>::Rel>>::Info: AbsorbFallback<F> ,
+    <LS as LinkStore<F, <Link as HasLink>::Rel>>::Info: AbsorbFallback<F>,
     Keys: KeyStore<Cursor<<Link as HasLink>::Rel>, F>,
 {
     async fn sizeof<'c>(&self, ctx: &'c mut sizeof::Context<F>) -> Result<&'c mut sizeof::Context<F>> {
@@ -1166,11 +1164,11 @@ where
     <Link as HasLink>::Rel: Eq + fmt::Debug + SkipFallback<F> + AbsorbFallback<F>,
     Store: LinkStore<F, <Link as HasLink>::Rel>,
     LG: LinkGenerator<Link>,
-    LS: LinkStore<F, <Link as HasLink>::Rel> + Default ,
-    <LS as LinkStore<F, <Link as HasLink>::Rel>>::Info: Default + AbsorbFallback<F> ,
+    LS: LinkStore<F, <Link as HasLink>::Rel> + Default,
+    <LS as LinkStore<F, <Link as HasLink>::Rel>>::Info: Default + AbsorbFallback<F>,
     Keys: KeyStore<Cursor<<Link as HasLink>::Rel>, F> + Default,
 {
-    async fn unwrap<'c, IS: io::IStream >(
+    async fn unwrap<'c, IS: io::IStream>(
         &mut self,
         _store: &'c Store,
         ctx: &'c mut unwrap::Context<F, IS>,
@@ -1268,7 +1266,7 @@ where
     <Link as HasLink>::Rel: Eq + fmt::Debug + SkipFallback<F> + AbsorbFallback<F>,
     LG: LinkGenerator<Link>,
     LS: LinkStore<F, <Link as HasLink>::Rel> + Default,
-    <LS as LinkStore<F, <Link as HasLink>::Rel>>::Info: AbsorbFallback<F> ,
+    <LS as LinkStore<F, <Link as HasLink>::Rel>>::Info: AbsorbFallback<F>,
     Keys: KeyStore<Cursor<<Link as HasLink>::Rel>, F>,
 {
     pub async fn export(&self, flag: u8, pwd: &str) -> Result<Vec<u8>> {
@@ -1306,7 +1304,7 @@ where
     <Link as HasLink>::Rel: Eq + fmt::Debug + SkipFallback<F> + AbsorbFallback<F>,
     LG: LinkGenerator<Link>,
     LS: LinkStore<F, <Link as HasLink>::Rel> + Default,
-    <LS as LinkStore<F, <Link as HasLink>::Rel>>::Info: Default + AbsorbFallback<F> ,
+    <LS as LinkStore<F, <Link as HasLink>::Rel>>::Info: Default + AbsorbFallback<F>,
     Keys: KeyStore<Cursor<<Link as HasLink>::Rel>, F> + Default,
 {
     pub async fn import(bytes: &[u8], flag: u8, pwd: &str) -> Result<Self> {

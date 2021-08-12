@@ -65,13 +65,14 @@ use iota_streams_core::{
         Box,
         Vec,
     },
-    psk, sponge::{
+    psk,
+    sponge::{
         prp::PRP,
         spongos,
     },
-    Result,
     wrapped_err,
     Errors::BadIdentifier,
+    Result,
     WrappedError,
 };
 use iota_streams_core_edsig::{
@@ -125,12 +126,9 @@ where
                             .commit()?
                             .mask(&self.key)?,
                         Identifier::EdPubKey(_pk) => match <[u8; 32]>::try_from(store_id.as_ref()) {
-                            Ok(slice) => ctx.x25519(
-                                &x25519::PublicKey::from(slice),
-                                &self.key,
-                            )?,
-                            Err(e) => Err(wrapped_err(BadIdentifier, WrappedError(e)))?,
-                        }
+                            Ok(slice) => ctx.x25519(&x25519::PublicKey::from(slice), &self.key)?,
+                            Err(e) => return Err(wrapped_err(BadIdentifier, WrappedError(e))),
+                        },
                     };
                 }
             }
@@ -182,12 +180,9 @@ where
                             .commit()?
                             .mask(&self.key)?,
                         Identifier::EdPubKey(_pk) => match <[u8; 32]>::try_from(store_id.as_ref()) {
-                            Ok(slice) => ctx.x25519(
-                                &x25519::PublicKey::from(slice),
-                                &self.key,
-                            )?,
-                            Err(e) => Err(wrapped_err(BadIdentifier, WrappedError(e)))?,
-                        }
+                            Ok(slice) => ctx.x25519(&x25519::PublicKey::from(slice), &self.key)?,
+                            Err(e) => return Err(wrapped_err(BadIdentifier, WrappedError(e))),
+                        },
                     };
                 }
                 ctx.spongos = inner_fork;

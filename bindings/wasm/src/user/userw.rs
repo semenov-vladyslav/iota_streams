@@ -10,9 +10,14 @@ use iota_streams::{
         TransportOptions,
     },
     app_channels::api::tangle::Address as ApiAddress,
-    core::prelude::{Arc, Mutex},
+    core::{
+        futures::executor::block_on,
+        prelude::{
+            Arc,
+            Mutex,
+        },
+    },
 };
-use iota_streams::core::futures::executor::block_on;
 
 #[wasm_bindgen]
 #[derive(Clone)]
