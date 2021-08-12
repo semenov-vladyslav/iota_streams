@@ -137,17 +137,6 @@ pub unsafe extern "C" fn auth_get_public_key(pk: *mut *const PublicKey, user: *c
 /// Announce creation of a new Channel.
 #[no_mangle]
 pub unsafe extern "C" fn auth_send_announce(addr: *mut *const Address, user: *mut Author) -> Err {
-    /*if let Some(user) = user.as_mut() {
-        if let Some(addr) = addr.as_mut() {
-            return run_async(user.send_announce()).map_or(Err::OperationFailed, |a| {
-                *addr = safe_into_ptr(a);
-                Err::Ok
-            })
-        }
-    };
-    Err::NullArgument*/
-
-
     user.as_mut().map_or(Err::NullArgument, |user| {
         addr.as_mut().map_or(Err::NullArgument, |addr| {
             run_async(user.send_announce()).map_or(Err::OperationFailed, |a| {
@@ -317,41 +306,21 @@ pub unsafe extern "C" fn auth_send_signed_packet(
 
 /// Process a Signed packet message
 #[no_mangle]
-pub async unsafe extern "C" fn auth_receive_signed_packet(
+pub unsafe extern "C" fn auth_receive_signed_packet(
     r: *mut PacketPayloads,
     user: *mut Author,
     link: *const Address,
 ) -> Err {
-    if let Some(r) = r.as_mut() {
-        if let Some(user) = user.as_mut() {
-            if let Some(link) = link.as_ref() {
-                return user.receive_signed_packet(link).await.map_or(Err::OperationFailed, |signed_payloads| {
-                    *r = signed_payloads.into();
-                    Err::Ok
-                })
-            }
-        }
-    };
-    Err::NullArgument
-
-/*    r.as_mut().map_or(Err::NullArgument, |r| {
+     r.as_mut().map_or(Err::NullArgument, |r| {
         user.as_mut().map_or(Err::NullArgument, |user| {
-            link.as_ref().map_or(Err::NullArgument, move |link| async {
-                /*let (sender, receiver) = flume::unbounded();
-                let schedule = move |runnable| sender.send(runnable).unwrap();
-                let (runnable, task) = spawn_local(user.receive_signed_packet(link), schedule);
-                runnable.schedule();
-                for runnable in receiver {
-                    runnable.run();
-                }
-                Future::wait*/
-                user.receive_signed_packet(link).await.map_or(Err::OperationFailed, |signed_payloads| {
+            link.as_ref().map_or(Err::NullArgument, move |link|{
+                run_async(user.receive_signed_packet(link)).map_or(Err::OperationFailed, |signed_payloads| {
                         *r = signed_payloads.into();
                         Err::Ok
                     })
             })
         })
-    })*/
+    })
 }
 
 #[no_mangle]
