@@ -23,9 +23,12 @@ use iota_streams::{
     },
     core::{
         prelude::{
+            Arc,
+            Mutex,
             Rc,
             String,
         },
+        futures::executor::block_on,
         psk::pskid_to_hex_string,
     },
     ddml::types::*,
@@ -41,8 +44,8 @@ impl Subscriber {
     #[wasm_bindgen(constructor)]
     pub fn new(seed: String, options: SendOptions) -> Subscriber {
         let mut client = ApiClient::new_from_url(&options.url());
-        client.set_send_options(options.into());
-        let transport = Rc::new(RefCell::new(client));
+        block_on(client.set_send_options(options.into()));
+        let transport = Arc::new(Mutex::new(client));
 
         let subscriber = Rc::new(RefCell::new(ApiSubscriber::new(&seed, transport)));
         Subscriber { subscriber }
@@ -55,7 +58,7 @@ impl Subscriber {
 
     #[wasm_bindgen(catch)]
     pub fn import(client: Client, bytes: Vec<u8>, password: &str) -> Result<Subscriber> {
-        ApiSubscriber::import(&bytes, password, client.to_inner()).map_or_else(
+        block_on(ApiSubscriber::import(&bytes, password, client.to_inner())).map_or_else(
             |err| Err(JsValue::from_str(&err.to_string())),
             |v| {
                 Ok(Subscriber {
@@ -130,9 +133,7 @@ impl Subscriber {
 
     #[wasm_bindgen(catch)]
     pub fn export(&self, password: &str) -> Result<Vec<u8>> {
-        self.subscriber
-            .borrow_mut()
-            .export(password)
+        block_on(self.subscriber.borrow_mut().export(password))
             .map_or_else(|err| Err(JsValue::from_str(&err.to_string())), Ok)
     }
 

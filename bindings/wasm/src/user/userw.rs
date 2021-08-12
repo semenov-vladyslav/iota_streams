@@ -3,7 +3,6 @@ use wasm_bindgen::prelude::*;
 
 use crate::types::*;
 
-use core::cell::RefCell;
 use iota_streams::{
     app::transport::{
         tangle::client::Client as ApiClient,
@@ -11,8 +10,9 @@ use iota_streams::{
         TransportOptions,
     },
     app_channels::api::tangle::Address as ApiAddress,
-    core::prelude::Rc,
+    core::prelude::{Arc, Mutex},
 };
+use iota_streams::core::futures::executor::block_on;
 
 #[wasm_bindgen]
 #[derive(Clone)]
@@ -23,8 +23,8 @@ impl Client {
     #[wasm_bindgen(constructor)]
     pub fn new(node: String, options: SendOptions) -> Self {
         let mut client = ApiClient::new_from_url(&node);
-        client.set_send_options(options.into());
-        let transport = Rc::new(RefCell::new(client));
+        block_on(client.set_send_options(options.into()));
+        let transport = Arc::new(Mutex::new(client));
 
         Client(transport)
     }
@@ -54,7 +54,7 @@ impl Client {
 
 impl From<ApiClient> for Client {
     fn from(client: ApiClient) -> Self {
-        let transport = Rc::new(RefCell::new(client));
+        let transport = Arc::new(Mutex::new(client));
 
         Client(transport)
     }

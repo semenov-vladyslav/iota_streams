@@ -1,7 +1,4 @@
-use core::{
-    cell::RefCell,
-    convert::TryFrom,
-};
+use core::convert::TryFrom;
 use iota_streams::{
     app::{
         message::Cursor as ApiCursor,
@@ -27,7 +24,8 @@ use iota_streams::{
     },
     core::{
         prelude::{
-            Rc,
+            Arc,
+            Mutex,
             String,
             ToString,
         },
@@ -155,7 +153,7 @@ impl Address {
     }
 }
 
-pub type ClientWrap = Rc<RefCell<Client>>;
+pub type ClientWrap = Arc<Mutex<Client>>;
 
 impl TryFrom<Address> for ApiAddress {
     type Error = JsValue;
