@@ -27,7 +27,7 @@ use iota_streams::{
     },
 };
 
-#[cfg(not(feature = "sync-client"))]
+#[cfg(not(feature = "client"))]
 use iota_streams::core::futures::executor::block_on;
 
 use core::ptr::{
@@ -143,16 +143,16 @@ pub extern "C" fn drop_unwrapped_messages(ms: *const UnwrappedMessages) {
     safe_drop_ptr(ms)
 }
 
-#[cfg(feature = "sync-client")]
+#[cfg(feature = "client")]
 pub type TransportWrap = iota_streams::app::transport::tangle::client::Client;
 
-#[cfg(not(feature = "sync-client"))]
+#[cfg(not(feature = "client"))]
 pub type TransportWrap = Arc<Mutex<BucketTransport>>;
 
 pub fn run_async<R>(fut: impl Future<Output=R>) -> R {
-    #[cfg(feature = "sync-client")]
+    #[cfg(feature = "client")]
     let ret = tokio::runtime::Runtime::new().unwrap().block_on(fut);
-    #[cfg(not(feature = "sync-client"))]
+    #[cfg(not(feature = "client"))]
     let ret = block_on(fut);
     ret
 }
@@ -167,14 +167,14 @@ pub extern "C" fn transport_drop(tsp: *mut TransportWrap) {
     safe_drop_mut_ptr(tsp)
 }
 
-#[cfg(feature = "sync-client")]
+#[cfg(feature = "client")]
 #[no_mangle]
 pub unsafe extern "C" fn transport_client_new_from_url(c_url: *const c_char) -> *mut TransportWrap {
     let url = CStr::from_ptr(c_url).to_str().unwrap();
     safe_into_mut_ptr(TransportWrap::new_from_url(url))
 }
 
-#[cfg(feature = "sync-client")]
+#[cfg(feature = "client")]
 mod client_details {
     use super::*;
     use iota_streams::app::transport::{
@@ -349,7 +349,7 @@ mod client_details {
     }
 }
 
-#[cfg(feature = "sync-client")]
+#[cfg(feature = "client")]
 pub use client_details::*;
 
 #[repr(C)]
