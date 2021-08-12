@@ -7,7 +7,7 @@ edition = "2018"
 [features]
 default = ["std", "client"]
 std = ["iota-streams/std"]
-client = ["tokio"]
+client = ["tokio", "iota-streams/client"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]

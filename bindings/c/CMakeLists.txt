@@ -39,6 +39,7 @@ if(${STATIC})
 
 else(${STATIC})
   add_executable(${PROJECT_NAME} main.c)
+  message(${cargo_features})
 
   if (WIN32)
     message("Windows")
