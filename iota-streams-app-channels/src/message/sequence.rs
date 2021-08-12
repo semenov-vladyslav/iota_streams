@@ -81,7 +81,7 @@ where
     <Link as HasLink>::Rel: 'a + Eq + SkipFallback<F> + AbsorbFallback<F>,
     Store: LinkStore<F, <Link as HasLink>::Rel>,
 {
-    async fn wrap<'c, OS: io::OStream + Send + Sync>(
+    async fn wrap<'c, OS: io::OStream>(
         &self,
         store: &Store,
         ctx: &'c mut wrap::Context<F, OS>,
@@ -125,7 +125,7 @@ where
     Store: LinkStore<F, <Link as HasLink>::Rel>,
     <Link as HasLink>::Rel: Eq + Default + SkipFallback<F> + AbsorbFallback<F>,
 {
-    async fn unwrap<'c, IS: io::IStream + Send + Sync>(
+    async fn unwrap<'c, IS: io::IStream>(
         &mut self,
         store: &'c Store,
         ctx: &'c mut unwrap::Context<F, IS>,

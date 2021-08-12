@@ -114,7 +114,7 @@ impl<F: PRP, Store: Send + Sync> ContentWrap<F, Store> for Identifier {
 
 #[async_trait]
 impl<F: PRP, Store: Send + Sync> ContentUnwrap<F, Store> for Identifier {
-    async fn unwrap<'c, IS: io::IStream + Send + Sync>(
+    async fn unwrap<'c, IS: io::IStream>(
         &mut self,
         _store: &'c Store,
         ctx: &'c mut unwrap::Context<F, IS>,
@@ -127,7 +127,7 @@ impl<F: PRP, Store: Send + Sync> ContentUnwrap<F, Store> for Identifier {
 
 #[async_trait]
 impl<F: PRP, Store: Send + Sync> ContentUnwrapNew<F, Store> for Identifier {
-    async fn unwrap_new<'c, IS: io::IStream + Send + Sync>(
+    async fn unwrap_new<'c, IS: io::IStream>(
         _store: &Store,
         ctx: &'c mut unwrap::Context<F, IS>,
     ) -> Result<(Self, &'c mut unwrap::Context<F, IS>)> {

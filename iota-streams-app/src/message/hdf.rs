@@ -212,7 +212,7 @@ where
     Link: AbsorbExternalFallback<F>,
     Store: Send + Sync,
 {
-    async fn wrap<'c, OS: io::OStream + Send + Sync>(
+    async fn wrap<'c, OS: io::OStream>(
         &self,
         _store: &Store,
         ctx: &'c mut wrap::Context<F, OS>,
@@ -257,7 +257,7 @@ where
     Link: AbsorbExternalFallback<F> + std::fmt::Debug + Clone,
     Store: Send + Sync,
 {
-    async fn unwrap<'c, IS: io::IStream + Send + Sync>(
+    async fn unwrap<'c, IS: io::IStream>(
         &mut self,
         _store: &'c Store,
         ctx: &'c mut unwrap::Context<F, IS>,

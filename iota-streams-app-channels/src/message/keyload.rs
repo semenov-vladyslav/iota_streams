@@ -150,7 +150,7 @@ where
     Store: LinkStore<F, <Link as HasLink>::Rel>,
     Keys: Clone + ExactSizeIterator<Item = (&'a Identifier, Vec<u8>)> + Send + Sync,
 {
-    async fn wrap<'c, OS: io::OStream + Send + Sync>(
+    async fn wrap<'c, OS: io::OStream>(
         &self,
         store: &Store,
         ctx: &'c mut wrap::Context<F, OS>,

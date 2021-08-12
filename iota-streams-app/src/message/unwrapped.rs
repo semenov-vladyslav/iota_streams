@@ -29,7 +29,7 @@ where
         info: <Store as LinkStore<F, <Link as HasLink>::Rel>>::Info,
     ) -> Result<Content>
     where
-        Store: LinkStore<F, <Link as HasLink>::Rel> + Send + Sync,
+        Store: LinkStore<F, <Link as HasLink>::Rel>,
     {
         self.spongos.commit();
         store.update(self.link.rel(), self.spongos, info)?;

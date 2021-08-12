@@ -15,7 +15,7 @@ use iota_streams_core::{
 };
 
 /// Write
-pub trait OStream: Send {
+pub trait OStream: Send + Sync {
     /// Try advance and panic in case of error.
     fn advance<'a>(&'a mut self, n: usize) -> &'a mut [u8] {
         let r = self.try_advance(n);
@@ -36,7 +36,7 @@ pub trait OStream: Send {
 }
 
 /// Read
-pub trait IStream: Send {
+pub trait IStream: Send + Sync {
     /// Try advance and panic in case of error.
     fn advance<'a>(&'a mut self, n: usize) -> &'a [u8] {
         let r = self.try_advance(n);

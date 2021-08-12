@@ -42,7 +42,7 @@ impl<T> AsMut<T> for Fallback<T> {
 }
 
 /// Trait allows for custom (non-standard DDML) types to be Absorb.
-pub trait AbsorbFallback<F> {
+pub trait AbsorbFallback<F>: Send + Sync {
     fn sizeof_absorb(&self, ctx: &mut sizeof::Context<F>) -> Result<()>;
     fn wrap_absorb<OS: io::OStream>(&self, ctx: &mut wrap::Context<F, OS>) -> Result<()>;
     fn unwrap_absorb<IS: io::IStream>(&mut self, ctx: &mut unwrap::Context<F, IS>) -> Result<()>;

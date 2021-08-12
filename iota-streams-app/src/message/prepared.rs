@@ -46,11 +46,11 @@ impl<'a, F, Link: Default, Store: 'a, Content> PreparedMessage<'a, F, Link, Stor
 impl<'a, F, Link, Store, Content> PreparedMessage<'a, F, Link, Store, Content>
 where
     F: PRP,
-    Link: HasLink + AbsorbExternalFallback<F> + Clone + Default + Send + Sync,
+    Link: HasLink + AbsorbExternalFallback<F> + Clone + Default,
     <Link as HasLink>::Rel: Eq + SkipFallback<F>,
-    Store: 'a + LinkStore<F, <Link as HasLink>::Rel> + Send + Sync,
+    Store: 'a + LinkStore<F, <Link as HasLink>::Rel>,
     HDF<Link>: ContentWrap<F, Store>,
-    Content: ContentWrap<F, Store> + Send + Sync,
+    Content: ContentWrap<F, Store>,
 {
     pub async fn wrap(&self) -> Result<WrappedMessage<F, Link>> {
         let buf_size = {
