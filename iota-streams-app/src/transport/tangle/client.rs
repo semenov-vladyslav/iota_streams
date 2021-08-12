@@ -1,5 +1,4 @@
 use core::fmt;
-#[cfg(not(feature = "sync-client"))]
 use iota_streams_core::{
     async_trait,
     prelude::Box,
@@ -171,22 +170,10 @@ pub async fn async_get_link_details(client: &iota_client::Client, link: &TangleA
 }
 
 /// Synchronised - Send message to the tangle using a node client
-#[cfg(feature = "sync-client")]
-pub fn sync_send_message_with_options<F>(client: &iota_client::Client, msg: &TangleMessage<F>) -> Result<()> {
-    block_on(async_send_message_with_options(client, msg))
-}
 
 /// Synchronised - Retrieve a message from the tangle using a node client
-#[cfg(feature = "sync-client")]
-pub fn sync_recv_messages<F>(client: &iota_client::Client, link: &TangleAddress) -> Result<Vec<TangleMessage<F>>> {
-    block_on(async_recv_messages(client, link))
-}
 
 /// Synchronised - Retrieve details of a link from the tangle using a node client
-#[cfg(feature = "sync-client")]
-pub fn sync_get_link_details(client: &iota_client::Client, link: &TangleAddress) -> Result<Details> {
-    block_on(async_get_link_details(client, link))
-}
 
 /// Stub type for iota_client::Client.  Removed: Copy, Default, Clone
 pub struct Client {
@@ -254,50 +241,7 @@ impl Clone for Client {
     }
 }
 
-// Sync Clients
-
-#[cfg(feature = "sync-client")]
-impl TransportOptions for Client {
-    type SendOptions = SendOptions;
-    fn get_send_options(&self) -> SendOptions {
-        self.send_opt.clone()
-    }
-    fn set_send_options(&mut self, opt: SendOptions) {
-        self.send_opt = opt;
-
-        // TODO
-        // self.client.set_send_options()
-    }
-
-    type RecvOptions = ();
-    fn get_recv_options(&self) {}
-    fn set_recv_options(&mut self, _opt: ()) {}
-}
-
-#[cfg(feature = "sync-client")]
-impl TransportDetails<TangleAddress> for Client {
-    type Details = Details;
-    fn get_link_details(&mut self, link: &TangleAddress) -> Result<Self::Details> {
-        sync_get_link_details(&self.client, link)
-    }
-}
-
-#[cfg(feature = "sync-client")]
-impl<F> Transport<TangleAddress, TangleMessage<F>> for Client {
-    /// Send a Streams message over the Tangle with the current timestamp and default SendOptions.
-    fn send_message(&mut self, msg: &TangleMessage<F>) -> Result<()> {
-        sync_send_message_with_options(&self.client, msg)
-    }
-
-    /// Receive a message.
-    fn recv_messages(&mut self, link: &TangleAddress) -> Result<Vec<TangleMessage<F>>> {
-        sync_recv_messages(&self.client, link)
-    }
-}
-
 // Async Clients
-
-#[cfg(not(feature = "sync-client"))]
 #[async_trait]
 impl TransportOptions for Client {
     type SendOptions = SendOptions;
@@ -316,7 +260,6 @@ impl TransportOptions for Client {
     async fn set_recv_options(&mut self, _opt: ()) {}
 }
 
-#[cfg(not(feature = "sync-client"))]
 #[async_trait]
 impl<F> Transport<TangleAddress, TangleMessage<F>> for Client
 where
@@ -343,7 +286,6 @@ where
     }
 }
 
-#[cfg(not(feature = "sync-client"))]
 #[async_trait]
 impl TransportDetails<TangleAddress> for Client {
     type Details = Details;

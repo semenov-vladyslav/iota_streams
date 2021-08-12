@@ -184,23 +184,6 @@ impl<Trans> User<Trans> {
 }
 
 impl<Trans: Transport + Clone> User<Trans> {
-    // Send
-
-    async fn transport_send(&mut self, msg: &Message) -> Result<()> {
-        #[cfg(feature = "sync-client")]
-        self.transport.send_message(msg)?;
-        #[cfg(not(feature = "sync-client"))]
-        self.transport.send_message(msg).await?;
-        Ok(())
-    }
-
-    async fn transport_recv(&mut self, link: &Address) -> Result<Message> {
-        #[cfg(feature = "sync-client")]
-        let msg = self.transport.recv_message(link)?;
-        #[cfg(not(feature = "sync-client"))]
-        let msg = self.transport.recv_message(link).await?;
-        Ok(msg)
-    }
     /// Send a message with sequencing logic. If channel is single-branched, then no secondary
     /// sequence message is sent and None is returned for the address.
     ///
@@ -208,7 +191,7 @@ impl<Trans: Transport + Clone> User<Trans> {
     /// * `wrapped` - A wrapped sequence object containing the sequence message and state
     async fn send_sequence(&mut self, wrapped: WrappedSequence) -> Result<Option<Address>> {
         if let Some(seq_msg) = wrapped.0 {
-            self.transport_send(&Message::new(seq_msg)).await?;
+            self.transport.send_message(&Message::new(seq_msg)).await?;
         }
 
         if let Some(wrap_state) = wrapped.1 {
@@ -220,7 +203,7 @@ impl<Trans: Transport + Clone> User<Trans> {
 
     /// Send a message without using sequencing logic. Reserved for Announce and Subscribe messages
     async fn send_message(&mut self, msg: WrappedMessage, info: MsgInfo) -> Result<Address> {
-        self.transport_send(&Message::new(msg.message)).await?;
+        self.transport.send_message(&Message::new(msg.message)).await?;
         self.commit_wrapped(msg.wrapped, info).await
     }
 
@@ -237,7 +220,7 @@ impl<Trans: Transport + Clone> User<Trans> {
         info: MsgInfo,
     ) -> Result<(Address, Option<Address>)> {
         let seq = self.user.wrap_sequence(ref_link).await?;
-        self.transport_send(&Message::new(msg.message)).await?;
+        self.transport.send_message(&Message::new(msg.message)).await?;
         let seq_link = self.send_sequence(seq).await?;
         let msg_link = self.commit_wrapped(msg.wrapped, info).await?;
         Ok((msg_link, seq_link))
@@ -247,7 +230,7 @@ impl<Trans: Transport + Clone> User<Trans> {
     pub async fn send_announce(&mut self) -> Result<Address> {
         let msg = self.user.announce().await?;
         try_or!(
-            self.transport_recv(&msg.message.link).await.is_err(),
+            self.transport.recv_message(&msg.message.link).await.is_err(),
             ChannelDuplication
         )?;
         self.send_message(msg, MsgInfo::Announce).await
@@ -328,7 +311,7 @@ impl<Trans: Transport + Clone> User<Trans> {
     ///  # Arguments
     ///  * `link` - Address of the message to be processed
     pub async fn receive_sequence(&mut self, link: &Address) -> Result<Address> {
-        let msg = self.transport_recv(link).await?;
+        let msg = self.transport.recv_message(link).await?;
         if let Some(_addr) = &self.user.appinst {
             let seq_msg = self
                 .user
@@ -351,7 +334,7 @@ impl<Trans: Transport + Clone> User<Trans> {
     ///  # Arguments
     ///  * `link` - Address of the message to be processed
     pub async fn receive_signed_packet(&mut self, link: &Address) -> Result<(PublicKey, Bytes, Bytes)> {
-        let msg = self.transport_recv(link).await?;
+        let msg = self.transport.recv_message(link).await?;
         // TODO: msg.timestamp is lost
         let m = self
             .user
@@ -365,7 +348,7 @@ impl<Trans: Transport + Clone> User<Trans> {
     ///  # Arguments
     ///  * `link` - Address of the message to be processed
     pub async fn receive_tagged_packet(&mut self, link: &Address) -> Result<(Bytes, Bytes)> {
-        let msg = self.transport_recv(link).await?;
+        let msg = self.transport.recv_message(link).await?;
         let m = self
             .user
             .handle_tagged_packet(msg.binary, MsgInfo::TaggedPacket)
@@ -378,7 +361,7 @@ impl<Trans: Transport + Clone> User<Trans> {
     ///  # Arguments
     ///  * `link` - Address of the message to be processed
     pub async fn receive_subscribe(&mut self, link: &Address) -> Result<()> {
-        let msg = self.transport_recv(link).await?;
+        let msg = self.transport.recv_message(link).await?;
         // TODO: Timestamp is lost.
         self.user.handle_subscribe(msg.binary, MsgInfo::Subscribe).await
     }
@@ -388,7 +371,7 @@ impl<Trans: Transport + Clone> User<Trans> {
     /// # Arguments
     /// * `link_to` - Address of the Channel Announcement message
     pub async fn receive_announcement(&mut self, link: &Address) -> Result<()> {
-        let msg = self.transport_recv(link).await?;
+        let msg = self.transport.recv_message(link).await?;
         self.user.handle_announcement(msg.binary, MsgInfo::Announce).await
     }
 
@@ -397,7 +380,7 @@ impl<Trans: Transport + Clone> User<Trans> {
     ///  # Arguments
     ///  * `link` - Address of the message to be processed
     pub async fn receive_keyload(&mut self, link: &Address) -> Result<bool> {
-        let msg = self.transport_recv(link).await?;
+        let msg = self.transport.recv_message(link).await?;
         let m = self.user.handle_keyload(msg.binary, MsgInfo::Keyload).await?;
         Ok(m.body)
     }
@@ -409,7 +392,7 @@ impl<Trans: Transport + Clone> User<Trans> {
     ///   * `link` - Address of the message to be processed
     ///   * `pk` - Optional ed25519 Public Key of the sending participant. None if unknown
     pub async fn receive_message(&mut self, link: &Address) -> Result<UnwrappedMessage> {
-        let msg = self.transport_recv(link).await?;
+        let msg = self.transport.recv_message(link).await?;
         self.handle_message(msg, true).await
     }
 
@@ -427,7 +410,7 @@ impl<Trans: Transport + Clone> User<Trans> {
             },
         ) in ids
         {
-            let msg = self.transport_recv(&link).await;
+            let msg = self.transport.recv_message(&link).await;
 
             if let Ok(msg) = msg {
                 if let Ok(msg) = self.handle_message(msg, true).await {
@@ -444,11 +427,11 @@ impl<Trans: Transport + Clone> User<Trans> {
     /// # Arguments
     /// * `link` - Address of message to act as root of previous message fetching
     pub async fn fetch_prev_msg(&mut self, link: &Address) -> Result<UnwrappedMessage> {
-        let msg = self.transport_recv(link).await?;
+        let msg = self.transport.recv_message(link).await?;
         let header = msg.binary.parse_header().await?.header;
 
         let prev_msg_link = Address::from_bytes(&header.previous_msg_link.0);
-        let prev_msg = self.transport_recv(&prev_msg_link).await?;
+        let prev_msg = self.transport.recv_message(&prev_msg_link).await?;
         let unwrapped = self.handle_message(prev_msg, false).await?;
         Ok(unwrapped)
     }
@@ -521,7 +504,7 @@ impl<Trans: Transport + Clone> User<Trans> {
                 }
                 message::SEQUENCE => {
                     let msg_link = self.process_sequence(msg, store).await?;
-                    let msg = self.transport_recv(&msg_link).await?;
+                    let msg = self.transport.recv_message(&msg_link).await?;
                     sequenced = true;
                     msg0 = msg;
                 }
@@ -533,7 +516,7 @@ impl<Trans: Transport + Clone> User<Trans> {
     /// Get the previous msg link and msg type from header of message and return in a tuple alongside
     /// the message itself
     async fn parse_msg_info(&mut self, link: &Address) -> Result<(Address, u8, Message)> {
-        let msg = self.transport_recv(link).await?;
+        let msg = self.transport.recv_message(link).await?;
         let header = msg.binary.parse_header().await?.header;
         let link = Address::from_bytes(&header.previous_msg_link.0);
         Ok((link, header.content_type, msg))
