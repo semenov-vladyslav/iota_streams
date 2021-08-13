@@ -11,8 +11,11 @@ use iota_streams_core::{
     Errors::MessageLinkNotFound,
 };
 
-#[cfg(feature = "async")]
-use iota_streams_core::Errors::MessageNotUnique;
+use iota_streams_core::{
+    async_trait,
+    prelude::Box,
+    Errors::MessageNotUnique,
+};
 
 #[derive(Clone)]
 pub struct BucketTransport<Link, Msg> {
@@ -37,50 +40,17 @@ where
     }
 }
 
-impl<Link, Msg> TransportOptions for BucketTransport<Link, Msg> {
+#[async_trait(?Send)]
+impl<Link: Send + Sync, Msg: Send + Sync> TransportOptions for BucketTransport<Link, Msg> {
     type SendOptions = ();
-    fn get_send_options(&self) {}
-    fn set_send_options(&mut self, _opt: ()) {}
+    async fn get_send_options(&self) {}
+    async fn set_send_options(&mut self, _opt: ()) {}
 
     type RecvOptions = ();
-    fn get_recv_options(&self) {}
-    fn set_recv_options(&mut self, _opt: ()) {}
+    async fn get_recv_options(&self) {}
+    async fn set_recv_options(&mut self, _opt: ()) {}
 }
 
-#[cfg(not(feature = "async"))]
-impl<Link, Msg> TransportDetails<Link> for BucketTransport<Link, Msg> {
-    type Details = ();
-    fn get_link_details(&mut self, _opt: &Link) -> Result<Self::Details> {
-        Ok(())
-    }
-}
-
-#[cfg(not(feature = "async"))]
-impl<Link, Msg> Transport<Link, Msg> for BucketTransport<Link, Msg>
-where
-    Link: Eq + hash::Hash + Clone + core::fmt::Debug + core::fmt::Display,
-    Msg: LinkedMessage<Link> + Clone,
-{
-    fn send_message(&mut self, msg: &Msg) -> Result<()> {
-        if let Some(msgs) = self.bucket.get_mut(msg.link()) {
-            msgs.push(msg.clone());
-            Ok(())
-        } else {
-            self.bucket.insert(msg.link().clone(), vec![msg.clone()]);
-            Ok(())
-        }
-    }
-
-    fn recv_messages(&mut self, link: &Link) -> Result<Vec<Msg>> {
-        if let Some(msgs) = self.bucket.get(link) {
-            Ok(msgs.clone())
-        } else {
-            err!(MessageLinkNotFound(link.to_string()))
-        }
-    }
-}
-
-#[cfg(feature = "async")]
 #[async_trait(?Send)]
 impl<Link, Msg> Transport<Link, Msg> for BucketTransport<Link, Msg>
 where
@@ -116,11 +86,11 @@ where
     }
 }
 
-#[cfg(feature = "async")]
 #[async_trait(?Send)]
 impl<Link, Msg> TransportDetails<Link> for BucketTransport<Link, Msg>
 where
     Link: Eq + hash::Hash + Clone + core::marker::Send + core::marker::Sync + core::fmt::Display,
+    Msg: Send + Sync,
 {
     type Details = ();
     async fn get_link_details(&mut self, _opt: &Link) -> Result<Self::Details> {

@@ -1,10 +1,8 @@
-use futures::executor::block_on;
-
-#[cfg(feature = "async")]
-use core::cell::RefCell;
 use core::fmt;
-#[cfg(feature = "async")]
-use iota_streams_core::prelude::Rc;
+use iota_streams_core::{
+    async_trait,
+    prelude::Box,
+};
 
 pub use iota_client;
 
@@ -20,6 +18,10 @@ use iota_client::bee_message::{
 
 use iota_streams_core::{
     err,
+    futures::{
+        executor::block_on,
+        future::join_all,
+    },
     prelude::Vec,
     try_or,
     wrapped_err,
@@ -35,8 +37,6 @@ use crate::{
         *,
     },
 };
-
-use futures::future::join_all;
 
 use iota_streams_core::prelude::String;
 
@@ -170,22 +170,10 @@ pub async fn async_get_link_details(client: &iota_client::Client, link: &TangleA
 }
 
 /// Synchronised - Send message to the tangle using a node client
-#[cfg(not(feature = "async"))]
-pub fn sync_send_message_with_options<F>(client: &iota_client::Client, msg: &TangleMessage<F>) -> Result<()> {
-    block_on(async_send_message_with_options(client, msg))
-}
 
 /// Synchronised - Retrieve a message from the tangle using a node client
-#[cfg(not(feature = "async"))]
-pub fn sync_recv_messages<F>(client: &iota_client::Client, link: &TangleAddress) -> Result<Vec<TangleMessage<F>>> {
-    block_on(async_recv_messages(client, link))
-}
 
 /// Synchronised - Retrieve details of a link from the tangle using a node client
-#[cfg(not(feature = "async"))]
-pub fn sync_get_link_details(client: &iota_client::Client, link: &TangleAddress) -> Result<Details> {
-    block_on(async_get_link_details(client, link))
-}
 
 /// Stub type for iota_client::Client.  Removed: Copy, Default, Clone
 pub struct Client {
@@ -253,12 +241,14 @@ impl Clone for Client {
     }
 }
 
+// Async Clients
+#[async_trait(?Send)]
 impl TransportOptions for Client {
     type SendOptions = SendOptions;
-    fn get_send_options(&self) -> SendOptions {
+    async fn get_send_options(&self) -> SendOptions {
         self.send_opt.clone()
     }
-    fn set_send_options(&mut self, opt: SendOptions) {
+    async fn set_send_options(&mut self, opt: SendOptions) {
         self.send_opt = opt;
 
         // TODO
@@ -266,32 +256,10 @@ impl TransportOptions for Client {
     }
 
     type RecvOptions = ();
-    fn get_recv_options(&self) {}
-    fn set_recv_options(&mut self, _opt: ()) {}
+    async fn get_recv_options(&self) {}
+    async fn set_recv_options(&mut self, _opt: ()) {}
 }
 
-#[cfg(not(feature = "async"))]
-impl TransportDetails<TangleAddress> for Client {
-    type Details = Details;
-    fn get_link_details(&mut self, link: &TangleAddress) -> Result<Self::Details> {
-        sync_get_link_details(&self.client, link)
-    }
-}
-
-#[cfg(not(feature = "async"))]
-impl<F> Transport<TangleAddress, TangleMessage<F>> for Client {
-    /// Send a Streams message over the Tangle with the current timestamp and default SendOptions.
-    fn send_message(&mut self, msg: &TangleMessage<F>) -> Result<()> {
-        sync_send_message_with_options(&self.client, msg)
-    }
-
-    /// Receive a message.
-    fn recv_messages(&mut self, link: &TangleAddress) -> Result<Vec<TangleMessage<F>>> {
-        sync_recv_messages(&self.client, link)
-    }
-}
-
-#[cfg(feature = "async")]
 #[async_trait(?Send)]
 impl<F> Transport<TangleAddress, TangleMessage<F>> for Client
 where
@@ -318,62 +286,10 @@ where
     }
 }
 
-#[cfg(feature = "async")]
 #[async_trait(?Send)]
 impl TransportDetails<TangleAddress> for Client {
     type Details = Details;
     async fn get_link_details(&mut self, link: &TangleAddress) -> Result<Self::Details> {
         async_get_link_details(&self.client, link).await
-    }
-}
-
-#[cfg(feature = "async")]
-#[async_trait(?Send)]
-impl TransportDetails<TangleAddress> for Rc<RefCell<Client>> {
-    type Details = Details;
-    async fn get_link_details(&mut self, link: &TangleAddress) -> Result<Self::Details> {
-        match (&*self).try_borrow_mut() {
-            Ok(tsp) => async_get_link_details(&tsp.client, link).await,
-            Err(err) => Err(wrapped_err!(TransportNotAvailable, WrappedError(err))),
-        }
-    }
-}
-
-// It's safe to impl async trait for Rc<RefCell<T>> targeting wasm as it's single-threaded.
-#[cfg(feature = "async")]
-#[async_trait(?Send)]
-impl<F> Transport<TangleAddress, TangleMessage<F>> for Rc<RefCell<Client>>
-where
-    F: 'static + core::marker::Send + core::marker::Sync,
-{
-    /// Send a Streams message over the Tangle with the current timestamp and default SendOptions.
-    async fn send_message(&mut self, msg: &TangleMessage<F>) -> Result<()> {
-        match (&*self).try_borrow_mut() {
-            Ok(tsp) => async_send_message_with_options(&tsp.client, msg).await,
-            Err(_err) => err!(TransportNotAvailable),
-        }
-    }
-
-    /// Receive a message.
-    async fn recv_messages(&mut self, link: &TangleAddress) -> Result<Vec<TangleMessage<F>>> {
-        match (&*self).try_borrow_mut() {
-            Ok(tsp) => async_recv_messages(&tsp.client, link).await,
-            Err(_err) => err!(TransportNotAvailable),
-        }
-    }
-
-    async fn recv_message(&mut self, link: &TangleAddress) -> Result<TangleMessage<F>> {
-        match (&*self).try_borrow_mut() {
-            Ok(tsp) => {
-                let mut msgs = async_recv_messages(&tsp.client, link).await?;
-                if let Some(msg) = msgs.pop() {
-                    try_or!(msgs.is_empty(), MessageNotUnique(link.msgid.to_string()))?;
-                    Ok(msg)
-                } else {
-                    err!(MessageLinkNotFound(link.msgid.to_string()))
-                }
-            }
-            Err(_err) => err!(TransportNotAvailable),
-        }
     }
 }

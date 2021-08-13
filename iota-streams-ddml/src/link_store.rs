@@ -26,7 +26,7 @@ use iota_streams_core::{
 /// The `link` type is generic and transport-specific. Links can be address+tag pair
 /// when messages are published in the Tangle. Or links can be a URL when HTTP is used.
 /// Or links can be a message sequence number in a stream/socket.
-pub trait LinkStore<F, Link> {
+pub trait LinkStore<F, Link>: Send + Sync {
     /// Additional data associated with the current message link/spongos state.
     /// This type is implementation specific, meaning different configurations
     /// of a Streams Application can use different Info types.
@@ -70,7 +70,12 @@ impl<F, Link, Info> Default for EmptyLinkStore<F, Link, Info> {
     }
 }
 
-impl<F, Link, Info> LinkStore<F, Link> for EmptyLinkStore<F, Link, Info> {
+impl<F, Link, Info> LinkStore<F, Link> for EmptyLinkStore<F, Link, Info>
+where
+    F: Send + Sync,
+    Link: Send + Sync,
+    Info: Send + Sync,
+{
     type Info = Info;
     fn update(&mut self, _link: &Link, _spongos: Spongos<F>, _info: Self::Info) -> Result<()> {
         Ok(())
@@ -109,8 +114,8 @@ impl<F: PRP, Link, Info> SingleLinkStore<F, Link, Info> {
 
 impl<F: PRP, Link, Info> LinkStore<F, Link> for SingleLinkStore<F, Link, Info>
 where
-    Link: Clone + Eq + Display,
-    Info: Clone,
+    Link: Clone + Eq + Display + Send + Sync,
+    Info: Clone + Send + Sync,
 {
     type Info = Info;
     fn lookup(&self, link: &Link) -> Result<(Spongos<F>, Self::Info)> {
@@ -142,7 +147,8 @@ pub struct DefaultLinkStore<F: PRP, Link, Info> {
 
 impl<F: PRP, Link, Info> Default for DefaultLinkStore<F, Link, Info>
 where
-    Link: Eq + hash::Hash,
+    Link: Eq + hash::Hash + Send + Sync,
+    Info: Send + Sync,
 {
     fn default() -> Self {
         Self {
@@ -154,8 +160,8 @@ where
 
 impl<F: PRP, Link, Info> LinkStore<F, Link> for DefaultLinkStore<F, Link, Info>
 where
-    Link: Eq + hash::Hash + Clone + Display,
-    Info: Clone,
+    Link: Eq + hash::Hash + Clone + Display + Send + Sync,
+    Info: Clone + Send + Sync,
 {
     type Info = Info;
 

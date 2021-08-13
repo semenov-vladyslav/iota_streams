@@ -3,7 +3,10 @@ use iota_streams_core::Result;
 use core::fmt;
 
 use super::*;
-use iota_streams_core::sponge::prp::PRP;
+use iota_streams_core::{
+    prelude::MutexGuard,
+    sponge::prp::PRP,
+};
 use iota_streams_ddml::command::unwrap;
 
 /// Message context preparsed for unwrapping.
@@ -21,17 +24,18 @@ impl<'a, F, Link: Default + Clone> PreparsedMessage<'a, F, Link> {
         self.header.get_content_type()
     }
 
-    pub fn unwrap<Store, Content>(
+    pub async fn unwrap<Store, Content>(
         mut self,
-        store: &Store,
+        store: &MutexGuard<'_, Store>,
         content: Content,
     ) -> Result<UnwrappedMessage<F, Link, Content>>
     where
         Content: ContentUnwrap<F, Store>,
         F: PRP,
+        Store: Send + Sync,
     {
         let mut pcf = pcf::PCF::default_with_content(content);
-        pcf.unwrap(store, &mut self.ctx)?;
+        pcf.unwrap(store, &mut self.ctx).await?;
         // Discard what's left of `self.ctx.stream`
         Ok(UnwrappedMessage {
             link: self.header.link,

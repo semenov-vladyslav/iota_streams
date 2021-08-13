@@ -29,7 +29,10 @@ use iota_streams::{
         },
     },
     core::{
+        futures::executor::block_on,
         prelude::{
+            Arc,
+            Mutex,
             Rc,
             String,
             ToString,
@@ -49,8 +52,8 @@ impl Author {
     #[wasm_bindgen(constructor)]
     pub fn new(seed: String, options: SendOptions, implementation: ChannelType) -> Author {
         let mut client = ApiClient::new_from_url(&options.url());
-        client.set_send_options(options.into());
-        let transport = Rc::new(RefCell::new(client));
+        block_on(client.set_send_options(options.into()));
+        let transport = Arc::new(Mutex::new(client));
 
         let author = Rc::new(RefCell::new(ApiAuthor::new(&seed, implementation.into(), transport)));
         Author { author }
@@ -67,7 +70,7 @@ impl Author {
 
     #[wasm_bindgen(catch)]
     pub fn import(client: Client, bytes: Vec<u8>, password: &str) -> Result<Author> {
-        ApiAuthor::import(&bytes, password, client.to_inner()).map_or_else(
+        block_on(ApiAuthor::import(&bytes, password, client.to_inner())).map_or_else(
             |err| Err(JsValue::from_str(&err.to_string())),
             |v| {
                 Ok(Author {
@@ -79,9 +82,7 @@ impl Author {
 
     #[wasm_bindgen(catch)]
     pub fn export(&self, password: &str) -> Result<Vec<u8>> {
-        self.author
-            .borrow_mut()
-            .export(password)
+        block_on(self.author.borrow_mut().export(password))
             .map_or_else(|err| Err(JsValue::from_str(&err.to_string())), Ok)
     }
 

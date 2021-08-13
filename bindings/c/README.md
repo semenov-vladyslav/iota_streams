@@ -5,8 +5,9 @@
 Check out `CMakeLists.txt` and change the 3 options to your preference:
 
 - `NO_STD`: Enable no_std build, without iota_client (when ON, `SYNC_CLIENT` isnt supported)
-- `SYNC_CLIENT`: Enable sync transport via iota_client, otherwise it's going to be Bucket which can only be used for tests
+- `IOTA_CLIENT`: Enable transport via iota_client, otherwise it's going to be Bucket which can only be used for tests
 - `STATIC`: Build static library when ON, otherwise dynamic library
+- `RELEASE`: Build release library when ON, otherwise build debug library
 
 Edit your author and subscriber seeds in `main.c`
 

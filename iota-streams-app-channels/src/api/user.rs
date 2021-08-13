@@ -1,5 +1,5 @@
 use core::{
-    cell::RefCell,
+    borrow::Borrow,
     fmt::{
         self,
         Debug,
@@ -17,11 +17,14 @@ use iota_streams_app::{
     },
 };
 use iota_streams_core::{
+    async_trait,
     err,
     prelude::{
         string::ToString,
         typenum::U32,
         vec,
+        Box,
+        Mutex,
         Vec,
     },
     prng,
@@ -59,6 +62,8 @@ use crate::{
     },
     message::*,
 };
+use core::borrow::BorrowMut;
+use iota_streams_core::prelude::Arc;
 
 const ANN_MESSAGE_NUM: u32 = 0;
 const SUB_MESSAGE_NUM: u32 = 0;
@@ -125,6 +130,7 @@ pub struct User<F, Link, LG, LS, Keys>
 where
     F: PRP,
     Link: HasLink,
+    LS: Send + Sync,
 {
     // PRNG object used for Ed25519, X25519, Spongos key generation, etc.
     // pub(crate) prng: prng::Prng<F>,
@@ -146,7 +152,7 @@ where
     pub(crate) link_gen: LG,
 
     /// Link store.
-    pub(crate) link_store: RefCell<LS>,
+    pub(crate) link_store: Arc<Mutex<LS>>,
 
     /// Application instance - Link to the announce message.
     /// None if channel is not created or user is not subscribed.
@@ -185,7 +191,7 @@ where
             key_store: Keys::default(),
             author_sig_pk: None,
             link_gen: LG::default(),
-            link_store: RefCell::new(LS::default()),
+            link_store: Arc::new(Mutex::new(LS::default())),
             appinst: None,
             flags: 0,
             message_encoding: Vec::new(),
@@ -230,7 +236,7 @@ where
             key_store: Keys::default(),
             author_sig_pk: None,
             link_gen: LG::default(),
-            link_store: RefCell::new(LS::default()),
+            link_store: Arc::new(Mutex::new(LS::default())),
             appinst: None,
             flags,
             message_encoding,
@@ -280,12 +286,12 @@ where
     }
 
     /// Save spongos and info associated to the message link
-    pub fn commit_wrapped(
+    pub async fn commit_wrapped(
         &mut self,
         wrapped: WrapState<F, Link>,
         info: <LS as LinkStore<F, <Link as HasLink>::Rel>>::Info,
     ) -> Result<Link> {
-        wrapped.commit(self.link_store.borrow_mut(), info)
+        wrapped.commit(self.link_store.lock().borrow_mut(), info)
     }
 
     /// Prepare Announcement message.
@@ -298,15 +304,15 @@ where
             .with_seq_num(ANN_MESSAGE_NUM)
             .with_identifier(&self.sig_kp.public.into());
         let content = announce::ContentWrap::new(&self.sig_kp, self.flags);
-        Ok(PreparedMessage::new(self.link_store.borrow(), header, content))
+        Ok(PreparedMessage::new(&self.link_store, header, content))
     }
 
     /// Create Announcement message.
-    pub fn announce(&self) -> Result<WrappedMessage<F, Link>> {
-        self.prepare_announcement()?.wrap()
+    pub async fn announce(&self) -> Result<WrappedMessage<F, Link>> {
+        self.prepare_announcement()?.wrap().await
     }
 
-    pub fn unwrap_announcement(
+    pub async fn unwrap_announcement(
         &self,
         preparsed: PreparsedMessage<'_, F, Link>,
     ) -> Result<UnwrappedMessage<F, Link, announce::ContentUnwrap<F>>> {
@@ -318,26 +324,26 @@ where
         }
 
         let content = announce::ContentUnwrap::<F>::default();
-        let r = preparsed.unwrap(&*self.link_store.borrow(), content);
+        let r = preparsed.unwrap(&*self.link_store.lock().borrow(), content).await;
         r
     }
 
     /// Bind Subscriber (or anonymously subscribe) to the channel announced
     /// in the message.
-    pub fn handle_announcement(
+    pub async fn handle_announcement(
         &mut self,
         msg: BinaryMessage<F, Link>,
         info: <LS as LinkStore<F, <Link as HasLink>::Rel>>::Info,
     ) -> Result<()> {
-        let preparsed = msg.parse_header()?;
+        let preparsed = msg.parse_header().await?;
         try_or!(
             preparsed.content_type() == ANNOUNCE,
             NotAnnouncement(preparsed.content_type())
         )?;
 
-        let unwrapped = self.unwrap_announcement(preparsed)?;
+        let unwrapped = self.unwrap_announcement(preparsed).await?;
         let link = unwrapped.link.clone();
-        let content = unwrapped.commit(self.link_store.borrow_mut(), info)?;
+        let content = unwrapped.commit(self.link_store.lock().borrow_mut(), info)?;
         // TODO: check commit after message is done / before joined
 
         // TODO: Verify trust to Author's public key?
@@ -385,7 +391,7 @@ where
                     author_ke_pk,
                     _phantom: core::marker::PhantomData,
                 };
-                Ok(PreparedMessage::new(self.link_store.borrow(), header, content))
+                Ok(PreparedMessage::new(&self.link_store, header, content))
             } else {
                 err!(AuthorExchangeKeyNotFound)
             }
@@ -395,31 +401,32 @@ where
     }
 
     /// Subscribe to the channel.
-    pub fn subscribe(&mut self, link_to: &Link) -> Result<WrappedMessage<F, Link>> {
-        self.prepare_subscribe(link_to)?.wrap()
+    pub async fn subscribe(&mut self, link_to: &Link) -> Result<WrappedMessage<F, Link>> {
+        self.prepare_subscribe(link_to)?.wrap().await
     }
 
-    pub fn unwrap_subscribe<'a>(
+    pub async fn unwrap_subscribe<'a>(
         &self,
         preparsed: PreparsedMessage<'a, F, Link>,
-    ) -> Result<UnwrappedMessage<F, Link, subscribe::ContentUnwrap<F, Link>>> {
+    ) -> Result<UnwrappedMessage<F, Link, subscribe::ContentUnwrap<'_, F, Link>>> {
         self.ensure_appinst(&preparsed)?;
         let content = subscribe::ContentUnwrap::new(&self.ke_kp.0)?;
-        preparsed.unwrap(&*self.link_store.borrow(), content)
+        preparsed.unwrap(&*self.link_store.lock().borrow(), content).await
     }
 
     /// Get public payload, decrypt masked payload and verify MAC.
-    pub fn handle_subscribe(
+    pub async fn handle_subscribe(
         &mut self,
         msg: BinaryMessage<F, Link>,
         info: <LS as LinkStore<F, <Link as HasLink>::Rel>>::Info,
     ) -> Result<()> {
-        let preparsed = msg.parse_header()?;
+        let preparsed = msg.parse_header().await?;
         // TODO: check content type
 
         let content = self
-            .unwrap_subscribe(preparsed)?
-            .commit(self.link_store.borrow_mut(), info)?;
+            .unwrap_subscribe(preparsed)
+            .await?
+            .commit(self.link_store.lock().borrow_mut(), info)?;
         // TODO: trust content.subscriber_sig_pk
         let subscriber_sig_pk = content.subscriber_sig_pk;
         let ref_link = self.appinst.as_ref().unwrap().rel().clone();
@@ -450,7 +457,7 @@ where
             sig_kp: &self.sig_kp,
             _phantom: core::marker::PhantomData,
         };
-        Ok(PreparedMessage::new(self.link_store.borrow(), header, content))
+        Ok(PreparedMessage::new(&self.link_store, header, content))
     }
 
     pub fn prepare_keyload<'a>(
@@ -505,19 +512,19 @@ where
 
     /// Create keyload message with a new session key shared with recipients
     /// identified by pre-shared key IDs and by Ed25519 public keys.
-    pub fn share_keyload(
+    pub async fn share_keyload(
         &mut self,
         link_to: &Link,
         psk_ids: &psk::PskIds,
         ke_pks: &Vec<&Identifier>,
     ) -> Result<WrappedMessage<F, Link>> {
-        self.prepare_keyload(link_to, psk_ids, ke_pks)?.wrap()
+        self.prepare_keyload(link_to, psk_ids, ke_pks)?.wrap().await
     }
 
     /// Create keyload message with a new session key shared with all Subscribers
     /// known to Author.
-    pub fn share_keyload_for_everyone(&mut self, link_to: &Link) -> Result<WrappedMessage<F, Link>> {
-        self.prepare_keyload_for_everyone(link_to)?.wrap()
+    pub async fn share_keyload_for_everyone(&mut self, link_to: &Link) -> Result<WrappedMessage<F, Link>> {
+        self.prepare_keyload_for_everyone(link_to)?.wrap().await
     }
 
     fn lookup_psk(&self, pskid: &Identifier) -> Option<psk::Psk> {
@@ -537,7 +544,7 @@ where
         }
     }
 
-    pub fn unwrap_keyload<'a, 'b>(
+    pub async fn unwrap_keyload<'a, 'b>(
         &'b self,
         preparsed: PreparsedMessage<'a, F, Link>,
     ) -> Result<
@@ -564,7 +571,7 @@ where
                 for<'c> fn(&'c Self, &Identifier) -> Option<psk::Psk>,
                 for<'c> fn(&'c Self, &Identifier) -> Option<&'c x25519::StaticSecret>,
             >::new(self, Self::lookup_psk, Self::lookup_ke_sk, author_sig_pk);
-            let unwrapped = preparsed.unwrap(&*self.link_store.borrow(), content)?;
+            let unwrapped = preparsed.unwrap(&*self.link_store.lock().borrow(), content).await?;
             Ok(unwrapped)
         } else {
             err!(AuthorSigKeyNotFound)
@@ -572,20 +579,20 @@ where
     }
 
     /// Try unwrapping session key from keyload using Subscriber's pre-shared key or Ed25519 private key (if any).
-    pub fn handle_keyload(
+    pub async fn handle_keyload(
         &mut self,
         msg: BinaryMessage<F, Link>,
         info: <LS as LinkStore<F, <Link as HasLink>::Rel>>::Info,
     ) -> Result<GenericMessage<Link, bool>> {
-        let preparsed = msg.parse_header()?;
+        let preparsed = msg.parse_header().await?;
         let prev_link = Link::from_bytes(&preparsed.header.previous_msg_link.0);
         let seq_no = preparsed.header.seq_num;
-        let unwrapped = self.unwrap_keyload(preparsed)?;
+        let unwrapped = self.unwrap_keyload(preparsed).await?;
         let processed;
 
         if unwrapped.pcf.content.key.is_some() {
             // Do not commit if key not found hence spongos state is invalid
-            let content = unwrapped.commit(self.link_store.borrow_mut(), info)?;
+            let content = unwrapped.commit(self.link_store.lock().borrow_mut(), info)?;
 
             // Presence of the key indicates the user is allowed
             // Unwrapped nonce and key in content are not used explicitly.
@@ -639,14 +646,14 @@ where
                     sig_kp: &self.sig_kp,
                     _phantom: core::marker::PhantomData,
                 };
-                Ok(PreparedMessage::new(self.link_store.borrow(), header, content))
+                Ok(PreparedMessage::new(&self.link_store, header, content))
             }
             None => err!(SeqNumRetrievalFailure),
         }
     }
 
     /// Create a signed message with public and masked payload.
-    pub fn sign_packet(
+    pub async fn sign_packet(
         &mut self,
         link_to: &Link,
         public_payload: &Bytes,
@@ -654,30 +661,32 @@ where
     ) -> Result<WrappedMessage<F, Link>> {
         self.prepare_signed_packet(link_to, public_payload, masked_payload)?
             .wrap()
+            .await
     }
 
-    pub fn unwrap_signed_packet<'a>(
+    pub async fn unwrap_signed_packet<'a>(
         &'a self,
         preparsed: PreparsedMessage<'a, F, Link>,
     ) -> Result<UnwrappedMessage<F, Link, signed_packet::ContentUnwrap<F, Link>>> {
         self.ensure_appinst(&preparsed)?;
         let content = signed_packet::ContentUnwrap::default();
-        preparsed.unwrap(&*self.link_store.borrow(), content)
+        preparsed.unwrap(&*self.link_store.lock().borrow(), content).await
     }
 
     /// Verify new Author's MSS public key and update Author's MSS public key.
-    pub fn handle_signed_packet(
+    pub async fn handle_signed_packet(
         &'_ mut self,
         msg: BinaryMessage<F, Link>,
         info: <LS as LinkStore<F, <Link as HasLink>::Rel>>::Info,
     ) -> Result<GenericMessage<Link, (ed25519::PublicKey, Bytes, Bytes)>> {
         // TODO: pass author_pk to unwrap
-        let preparsed = msg.parse_header()?;
+        let preparsed = msg.parse_header().await?;
         let prev_link = Link::from_bytes(&preparsed.header.previous_msg_link.0);
         let seq_no = preparsed.header.seq_num;
         let content = self
-            .unwrap_signed_packet(preparsed)?
-            .commit(self.link_store.borrow_mut(), info)?;
+            .unwrap_signed_packet(preparsed)
+            .await?
+            .commit(self.link_store.lock().borrow_mut(), info)?;
         if !self.is_multi_branching() {
             self.store_state_for_all(msg.link.rel().clone(), seq_no.0 as u32 + 1)?;
         }
@@ -711,7 +720,7 @@ where
                     masked_payload,
                     _phantom: core::marker::PhantomData,
                 };
-                Ok(PreparedMessage::new(self.link_store.borrow(), header, content))
+                Ok(PreparedMessage::new(&self.link_store, header, content))
             }
             None => err!(SeqNumRetrievalFailure),
         }
@@ -730,7 +739,7 @@ where
 
     /// Create a tagged (ie. MACed) message with public and masked payload.
     /// Tagged messages must be linked to a secret spongos state, ie. keyload or a message linked to keyload.
-    pub fn tag_packet(
+    pub async fn tag_packet(
         &mut self,
         link_to: &Link,
         public_payload: &Bytes,
@@ -738,29 +747,31 @@ where
     ) -> Result<WrappedMessage<F, Link>> {
         self.prepare_tagged_packet(link_to, public_payload, masked_payload)?
             .wrap()
+            .await
     }
 
-    pub fn unwrap_tagged_packet(
+    pub async fn unwrap_tagged_packet(
         &self,
         preparsed: PreparsedMessage<'_, F, Link>,
     ) -> Result<UnwrappedMessage<F, Link, tagged_packet::ContentUnwrap<F, Link>>> {
         self.ensure_appinst(&preparsed)?;
         let content = tagged_packet::ContentUnwrap::new();
-        preparsed.unwrap(&*self.link_store.borrow(), content)
+        preparsed.unwrap(&*self.link_store.lock().borrow(), content).await
     }
 
     /// Get public payload, decrypt masked payload and verify MAC.
-    pub fn handle_tagged_packet(
+    pub async fn handle_tagged_packet(
         &mut self,
         msg: BinaryMessage<F, Link>,
         info: <LS as LinkStore<F, <Link as HasLink>::Rel>>::Info,
     ) -> Result<GenericMessage<Link, (Bytes, Bytes)>> {
-        let preparsed = msg.parse_header()?;
+        let preparsed = msg.parse_header().await?;
         let prev_link = Link::from_bytes(&preparsed.header.previous_msg_link.0);
         let seq_no = preparsed.header.seq_num;
         let content = self
-            .unwrap_tagged_packet(preparsed)?
-            .commit(self.link_store.borrow_mut(), info)?;
+            .unwrap_tagged_packet(preparsed)
+            .await?
+            .commit(self.link_store.lock().borrow_mut(), info)?;
         if !self.is_multi_branching() {
             self.store_state_for_all(msg.link.rel().clone(), seq_no.0 as u32 + 1)?;
         }
@@ -793,10 +804,10 @@ where
             ref_link,
         };
 
-        Ok(PreparedMessage::new(self.link_store.borrow(), header, content))
+        Ok(PreparedMessage::new(&self.link_store, header, content))
     }
 
-    pub fn wrap_sequence(&mut self, ref_link: &<Link as HasLink>::Rel) -> Result<WrappedSequence<F, Link>> {
+    pub async fn wrap_sequence(&mut self, ref_link: &<Link as HasLink>::Rel) -> Result<WrappedSequence<F, Link>> {
         let identifier = self.get_identifier()?;
         match self.key_store.get(&identifier) {
             Some(cursor) => {
@@ -821,8 +832,8 @@ where
                     };
 
                     let wrapped = {
-                        let prepared = PreparedMessage::new(self.link_store.borrow(), header, content);
-                        prepared.wrap()?
+                        let prepared = PreparedMessage::new(&self.link_store, header, content);
+                        prepared.wrap().await?
                     };
 
                     Ok(WrappedSequence::new().with_cursor(cursor).with_wrapped(wrapped))
@@ -840,7 +851,7 @@ where
         }
     }
 
-    pub fn commit_sequence(
+    pub async fn commit_sequence(
         &mut self,
         wrapped: WrapStateSequence<F, Link>,
         info: <LS as LinkStore<F, <Link as HasLink>::Rel>>::Info,
@@ -851,7 +862,7 @@ where
                 let link = wrapped.link.clone();
                 cursor.link = wrapped.link.rel().clone();
                 cursor.next_seq();
-                wrapped.commit(self.link_store.borrow_mut(), info)?;
+                wrapped.commit(self.link_store.lock().borrow_mut(), info)?;
                 self.key_store
                     .insert_cursor(Identifier::EdPubKey(self.sig_kp.public.into()), cursor)?;
                 Ok(Some(link))
@@ -863,28 +874,29 @@ where
         }
     }
 
-    pub fn unwrap_sequence(
+    pub async fn unwrap_sequence(
         &self,
         preparsed: PreparsedMessage<'_, F, Link>,
     ) -> Result<UnwrappedMessage<F, Link, sequence::ContentUnwrap<Link>>> {
         self.ensure_appinst(&preparsed)?;
         let content = sequence::ContentUnwrap::default();
-        preparsed.unwrap(&*self.link_store.borrow(), content)
+        preparsed.unwrap(&*self.link_store.lock().borrow(), content).await
     }
 
     // Fetch unwrapped sequence message to fetch referenced message
-    pub fn handle_sequence(
+    pub async fn handle_sequence(
         &mut self,
         msg: BinaryMessage<F, Link>,
         info: <LS as LinkStore<F, <Link as HasLink>::Rel>>::Info,
         store: bool,
     ) -> Result<GenericMessage<Link, sequence::ContentUnwrap<Link>>> {
-        let preparsed = msg.parse_header()?;
+        let preparsed = msg.parse_header().await?;
         let sender_id = preparsed.header.sender_id;
         let prev_link = Link::from_bytes(&preparsed.header.previous_msg_link.0);
         let content = self
-            .unwrap_sequence(preparsed)?
-            .commit(self.link_store.borrow_mut(), info)?;
+            .unwrap_sequence(preparsed)
+            .await?
+            .commit(self.link_store.lock().borrow_mut(), info)?;
         if store {
             self.store_state(sender_id, msg.link.rel().clone())?;
         }
@@ -1020,6 +1032,7 @@ where
     }
 }
 
+#[async_trait]
 impl<F, Link, LG, LS, Keys> ContentSizeof<F> for User<F, Link, LG, LS, Keys>
 where
     F: PRP,
@@ -1031,7 +1044,7 @@ where
     <LS as LinkStore<F, <Link as HasLink>::Rel>>::Info: AbsorbFallback<F>,
     Keys: KeyStore<Cursor<<Link as HasLink>::Rel>, F>,
 {
-    fn sizeof<'c>(&self, ctx: &'c mut sizeof::Context<F>) -> Result<&'c mut sizeof::Context<F>> {
+    async fn sizeof<'c>(&self, ctx: &'c mut sizeof::Context<F>) -> Result<&'c mut sizeof::Context<F>> {
         ctx.mask(<&NBytes<U32>>::from(&self.sig_kp.secret.as_bytes()[..]))?
             .absorb(Uint8(self.flags))?
             .absorb(<&Bytes>::from(&self.message_encoding))?
@@ -1049,34 +1062,36 @@ where
             ctx.absorb(author_sig_pk)?;
         }
 
-        let link_store = self.link_store.borrow();
+        let link_store = self.link_store.lock();
         let links = link_store.iter();
         let repeated_links = Size(links.len());
         let keys = self.key_store.iter();
         let repeated_keys = Size(keys.len());
-        ctx.absorb(repeated_links)?
-            .repeated(links.into_iter(), |ctx, (link, (s, info))| {
-                ctx.absorb(<&Fallback<<Link as HasLink>::Rel>>::from(link))?
-                    .mask(<&NBytes<F::CapacitySize>>::from(s.arr()))?
-                    .absorb(<&Fallback<<LS as LinkStore<F, <Link as HasLink>::Rel>>::Info>>::from(
-                        info,
-                    ))?;
-                Ok(ctx)
-            })?
-            .absorb(repeated_keys)?
-            .repeated(keys.into_iter(), |ctx, (id, cursor)| {
-                let ctx = id.sizeof(ctx)?;
-                ctx.absorb(<&Fallback<<Link as HasLink>::Rel>>::from(&cursor.link))?
-                    .absorb(Uint32(cursor.branch_no))?
-                    .absorb(Uint32(cursor.seq_no))?;
-                Ok(ctx)
-            })?
-            .commit()?
-            .squeeze(Mac(32))?;
+
+        ctx.absorb(repeated_links)?;
+        for link in links {
+            let (link, (s, info)) = link;
+            ctx.absorb(<&Fallback<<Link as HasLink>::Rel>>::from(link))?
+                .mask(<&NBytes<F::CapacitySize>>::from(s.arr()))?
+                .absorb(<&Fallback<<LS as LinkStore<F, <Link as HasLink>::Rel>>::Info>>::from(
+                    info,
+                ))?;
+        }
+
+        ctx.absorb(repeated_keys)?;
+        for key in keys {
+            let (id, cursor) = key;
+            let ctx = id.sizeof(ctx).await?;
+            ctx.absorb(<&Fallback<<Link as HasLink>::Rel>>::from(&cursor.link))?
+                .absorb(Uint32(cursor.branch_no))?
+                .absorb(Uint32(cursor.seq_no))?;
+        }
+        ctx.commit()?.squeeze(Mac(32))?;
         Ok(ctx)
     }
 }
 
+#[async_trait]
 impl<F, Link, Store, LG, LS, Keys> ContentWrap<F, Store> for User<F, Link, LG, LS, Keys>
 where
     F: PRP,
@@ -1089,7 +1104,7 @@ where
     <LS as LinkStore<F, <Link as HasLink>::Rel>>::Info: AbsorbFallback<F>,
     Keys: KeyStore<Cursor<<Link as HasLink>::Rel>, F>,
 {
-    fn wrap<'c, OS: io::OStream>(
+    async fn wrap<'c, OS: io::OStream>(
         &self,
         _store: &Store,
         ctx: &'c mut wrap::Context<F, OS>,
@@ -1111,34 +1126,36 @@ where
             ctx.absorb(author_sig_pk)?;
         }
 
-        let link_store = self.link_store.borrow();
+        let link_store = self.link_store.lock();
         let links = link_store.iter();
         let repeated_links = Size(links.len());
         let keys = self.key_store.iter();
         let repeated_keys = Size(keys.len());
-        ctx.absorb(repeated_links)?
-            .repeated(links.into_iter(), |ctx, (link, (s, info))| {
-                ctx.absorb(<&Fallback<<Link as HasLink>::Rel>>::from(link))?
-                    .mask(<&NBytes<F::CapacitySize>>::from(s.arr()))?
-                    .absorb(<&Fallback<<LS as LinkStore<F, <Link as HasLink>::Rel>>::Info>>::from(
-                        info,
-                    ))?;
-                Ok(ctx)
-            })?
-            .absorb(repeated_keys)?
-            .repeated(keys.into_iter(), |ctx, (id, cursor)| {
-                let ctx = id.wrap(_store, ctx)?;
-                ctx.absorb(<&Fallback<<Link as HasLink>::Rel>>::from(&cursor.link))?
-                    .absorb(Uint32(cursor.branch_no))?
-                    .absorb(Uint32(cursor.seq_no))?;
-                Ok(ctx)
-            })?
-            .commit()?
-            .squeeze(Mac(32))?;
+
+        ctx.absorb(repeated_links)?;
+        for link in links.into_iter() {
+            let (link, (s, info)) = link;
+            ctx.absorb(<&Fallback<<Link as HasLink>::Rel>>::from(link))?
+                .mask(<&NBytes<F::CapacitySize>>::from(s.arr()))?
+                .absorb(<&Fallback<<LS as LinkStore<F, <Link as HasLink>::Rel>>::Info>>::from(
+                    info,
+                ))?;
+        }
+
+        ctx.absorb(repeated_keys)?;
+        for key in keys {
+            let (id, cursor) = key;
+            let ctx = id.clone().wrap(_store.borrow(), ctx.borrow_mut()).await?;
+            ctx.absorb(<&Fallback<<Link as HasLink>::Rel>>::from(&cursor.borrow().link))?
+                .absorb(Uint32(cursor.branch_no))?
+                .absorb(Uint32(cursor.seq_no))?;
+        }
+        ctx.commit()?.squeeze(Mac(32))?;
         Ok(ctx)
     }
 }
 
+#[async_trait]
 impl<F, Link, Store, LG, LS, Keys> ContentUnwrap<F, Store> for User<F, Link, LG, LS, Keys>
 where
     F: PRP,
@@ -1151,9 +1168,9 @@ where
     <LS as LinkStore<F, <Link as HasLink>::Rel>>::Info: Default + AbsorbFallback<F>,
     Keys: KeyStore<Cursor<<Link as HasLink>::Rel>, F> + Default,
 {
-    fn unwrap<'c, IS: io::IStream>(
+    async fn unwrap<'c, IS: io::IStream>(
         &mut self,
-        _store: &Store,
+        _store: &'c Store,
         ctx: &'c mut unwrap::Context<F, IS>,
     ) -> Result<&'c mut unwrap::Context<F, IS>> {
         let mut sig_sk_bytes = NBytes::<U32>::default();
@@ -1195,30 +1212,30 @@ where
 
         let mut repeated_links = Size(0);
         let mut link_store = LS::default();
-        ctx.absorb(&mut repeated_links)?.repeated(repeated_links, |ctx| {
+
+        ctx.absorb(&mut repeated_links)?;
+        for _ in 0..repeated_links.0 {
             let mut link = Fallback(<Link as HasLink>::Rel::default());
             let mut s = NBytes::<F::CapacitySize>::default();
             let mut info = Fallback(<LS as LinkStore<F, <Link as HasLink>::Rel>>::Info::default());
             ctx.absorb(&mut link)?.mask(&mut s)?.absorb(&mut info)?;
             let a: GenericArray<u8, F::CapacitySize> = s.into();
             link_store.insert(&link.0, Inner::<F>::from(a), info.0)?;
-            Ok(ctx)
-        })?;
+        }
 
         let mut repeated_keys = Size(0);
         let mut key_store = Keys::default();
-        ctx.absorb(&mut repeated_keys)?
-            .repeated(repeated_keys, |ctx| {
-                let mut link = Fallback(<Link as HasLink>::Rel::default());
-                let mut branch_no = Uint32(0);
-                let mut seq_no = Uint32(0);
-                let (id, ctx) = Identifier::unwrap_new(_store, ctx)?;
-                ctx.absorb(&mut link)?.absorb(&mut branch_no)?.absorb(&mut seq_no)?;
-                key_store.insert_cursor(id, Cursor::new_at(link.0, branch_no.0, seq_no.0))?;
-                Ok(ctx)
-            })?
-            .commit()?
-            .squeeze(Mac(32))?;
+        ctx.absorb(&mut repeated_keys)?;
+        for _ in 0..repeated_keys.0 {
+            let mut link = Fallback(<Link as HasLink>::Rel::default());
+            let mut branch_no = Uint32(0);
+            let mut seq_no = Uint32(0);
+            let (id, ctx) = Identifier::unwrap_new(_store, ctx).await?;
+            ctx.absorb(&mut link)?.absorb(&mut branch_no)?.absorb(&mut seq_no)?;
+            key_store.insert_cursor(id, Cursor::new_at(link.0, branch_no.0, seq_no.0))?;
+        }
+
+        ctx.commit()?.squeeze(Mac(32))?;
 
         let sig_sk = ed25519::SecretKey::from_bytes(sig_sk_bytes.as_ref()).unwrap();
         let sig_pk = ed25519::PublicKey::from(&sig_sk);
@@ -1227,7 +1244,7 @@ where
             public: sig_pk,
         };
         self.ke_kp = x25519::keypair_from_ed25519(&self.sig_kp);
-        self.link_store = RefCell::new(link_store);
+        self.link_store = Arc::new(Mutex::new(link_store));
         self.key_store = key_store;
         self.author_sig_pk = author_sig_pk;
         if let Some(ref seed) = appinst {
@@ -1252,12 +1269,12 @@ where
     <LS as LinkStore<F, <Link as HasLink>::Rel>>::Info: AbsorbFallback<F>,
     Keys: KeyStore<Cursor<<Link as HasLink>::Rel>, F>,
 {
-    pub fn export(&self, flag: u8, pwd: &str) -> Result<Vec<u8>> {
+    pub async fn export(&self, flag: u8, pwd: &str) -> Result<Vec<u8>> {
         const VERSION: u8 = 0;
         let buf_size = {
             let mut ctx = sizeof::Context::<F>::new();
             ctx.absorb(Uint8(VERSION))?.absorb(Uint8(flag))?;
-            self.sizeof(&mut ctx)?;
+            self.sizeof(&mut ctx).await?;
             ctx.get_size()
         };
 
@@ -1271,7 +1288,7 @@ where
                 .absorb(Uint8(flag))?
                 .absorb(External(&key))?;
             let store = EmptyLinkStore::<F, <Link as HasLink>::Rel, ()>::default();
-            self.wrap(&store, &mut ctx)?;
+            self.wrap(&store, &mut ctx).await?;
             try_or!(ctx.stream.is_empty(), OutputStreamNotFullyConsumed(ctx.stream.len()))?;
         }
 
@@ -1290,7 +1307,7 @@ where
     <LS as LinkStore<F, <Link as HasLink>::Rel>>::Info: Default + AbsorbFallback<F>,
     Keys: KeyStore<Cursor<<Link as HasLink>::Rel>, F> + Default,
 {
-    pub fn import(bytes: &[u8], flag: u8, pwd: &str) -> Result<Self> {
+    pub async fn import(bytes: &[u8], flag: u8, pwd: &str) -> Result<Self> {
         const VERSION: u8 = 0;
 
         let mut ctx = unwrap::Context::new(bytes);
@@ -1306,7 +1323,7 @@ where
 
         let mut user = User::default();
         let store = EmptyLinkStore::<F, <Link as HasLink>::Rel, ()>::default();
-        user.unwrap(&store, &mut ctx)?;
+        user.unwrap(&store, &mut ctx).await?;
         try_or!(ctx.stream.is_empty(), InputStreamNotFullyConsumed(ctx.stream.len()))?;
         Ok(user)
     }

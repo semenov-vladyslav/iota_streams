@@ -7,14 +7,11 @@ use iota_streams::{
     },
     core::{
         panic_if_not,
-        prelude::Rc,
         println,
         Result,
     },
     ddml::types::*,
 };
-
-use core::cell::RefCell;
 
 use super::utils;
 use std::{
@@ -22,7 +19,7 @@ use std::{
     time::Duration,
 };
 
-pub fn example<T: Transport>(transport: Rc<RefCell<T>>, channel_type: ChannelType, seed: &str) -> Result<()> {
+pub async fn example<T: Transport>(transport: T, channel_type: ChannelType, seed: &str) -> Result<()> {
     let mut author = Author::new(seed, channel_type.clone(), transport.clone());
     println!("Author multi branching?: {}", author.is_multi_branching());
 
@@ -33,28 +30,28 @@ pub fn example<T: Transport>(transport: Rc<RefCell<T>>, channel_type: ChannelTyp
 
     println!("\nAnnounce Channel");
     let announcement_link = {
-        let msg = author.send_announce()?;
+        let msg = author.send_announce().await?;
         println!("  msg => <{}> {}", msg.msgid, msg);
         msg
     };
     println!("  Author channel address: {}", author.channel_address().unwrap());
 
     println!("\nHandle Announce Channel");
-    subscriberA.receive_announcement(&announcement_link)?;
+    subscriberA.receive_announcement(&announcement_link).await?;
 
     println!("\nSubscribe A");
     let subscribeA_link = {
-        let msg = subscriberA.send_subscribe(&announcement_link)?;
+        let msg = subscriberA.send_subscribe(&announcement_link).await?;
         println!("  msg => <{}> {}", msg.msgid, msg);
         msg
     };
 
     println!("\nHandle Subscribe A");
-    author.receive_subscribe(&subscribeA_link)?;
+    author.receive_subscribe(&subscribeA_link).await?;
 
     println!("\nShare keyload");
     let mut previous_msg_link = {
-        let (msg, seq) = author.send_keyload_for_everyone(&announcement_link)?;
+        let (msg, seq) = author.send_keyload_for_everyone(&announcement_link).await?;
         println!("  msg => <{}> {}", msg.msgid, msg);
         panic_if_not(seq.is_none());
         msg
@@ -63,7 +60,7 @@ pub fn example<T: Transport>(transport: Rc<RefCell<T>>, channel_type: ChannelTyp
     for i in 1..6 {
         println!("Signed packet {} - Author", i);
         previous_msg_link = {
-            let (msg, seq) = author.send_signed_packet(&previous_msg_link, &public_payload, &masked_payload)?;
+            let (msg, seq) = author.send_signed_packet(&previous_msg_link, &public_payload, &masked_payload).await?;
             println!("  msg => <{}> {}", msg.msgid, msg);
             panic_if_not(seq.is_none());
             msg
@@ -73,12 +70,12 @@ pub fn example<T: Transport>(transport: Rc<RefCell<T>>, channel_type: ChannelTyp
     println!("\nWait a moment for messages to propogate...");
     sleep(Duration::from_secs(3));
     println!("Subscriber A fetching transactions...");
-    utils::s_fetch_next_messages(&mut subscriberA);
+    utils::s_fetch_next_messages(&mut subscriberA).await;
 
     for i in 6..11 {
         println!("Tagged packet {} - SubscriberA", i);
         previous_msg_link = {
-            let (msg, seq) = subscriberA.send_tagged_packet(&previous_msg_link, &public_payload, &masked_payload)?;
+            let (msg, seq) = subscriberA.send_tagged_packet(&previous_msg_link, &public_payload, &masked_payload).await?;
             println!("  msg => <{}> {}", msg.msgid, msg);
             panic_if_not(seq.is_none());
             msg
@@ -88,10 +85,10 @@ pub fn example<T: Transport>(transport: Rc<RefCell<T>>, channel_type: ChannelTyp
     println!("\nWait a moment for messages to propogate...");
     sleep(Duration::from_secs(3));
     println!("Author fetching transactions...");
-    utils::a_fetch_next_messages(&mut author);
+    utils::a_fetch_next_messages(&mut author).await;
 
     println!("\n\nTime to try to recover the instance...");
-    let mut new_author = Author::recover(seed, &announcement_link, channel_type, transport)?;
+    let mut new_author = Author::recover(seed, &announcement_link, channel_type, transport).await?;
 
     let state = new_author.fetch_state()?;
     let old_state = author.fetch_state()?;
@@ -111,13 +108,13 @@ pub fn example<T: Transport>(transport: Rc<RefCell<T>>, channel_type: ChannelTyp
     }
 
     println!("States match...\nSending next sequenced message...");
-    let (last_msg, _seq) = new_author.send_signed_packet(latest_link, &public_payload, &masked_payload)?;
+    let (last_msg, _seq) = new_author.send_signed_packet(latest_link, &public_payload, &masked_payload).await?;
     println!("  msg => <{}> {}", last_msg.msgid, last_msg);
 
     // Wait a second for message to propagate
     sleep(Duration::from_secs(1));
     println!("\nSubscriber A fetching transactions...");
-    let msgs = subscriberA.fetch_next_msgs();
+    let msgs = subscriberA.fetch_next_msgs().await;
     panic_if_not!(!msgs.is_empty());
 
     let mut matches = false;

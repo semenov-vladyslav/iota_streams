@@ -29,7 +29,11 @@ use iota_streams_app::message::{
     HasLink,
 };
 use iota_streams_core::{
-    prelude::typenum::Unsigned as _,
+    async_trait,
+    prelude::{
+        typenum::Unsigned as _,
+        Box,
+    },
     sponge::{
         prp::PRP,
         spongos,
@@ -57,13 +61,14 @@ where
     pub(crate) _phantom: core::marker::PhantomData<(F, Link)>,
 }
 
+#[async_trait]
 impl<'a, F, Link> message::ContentSizeof<F> for ContentWrap<'a, F, Link>
 where
     F: PRP,
     Link: HasLink,
     <Link as HasLink>::Rel: 'a + Eq + SkipFallback<F>,
 {
-    fn sizeof<'c>(&self, ctx: &'c mut sizeof::Context<F>) -> Result<&'c mut sizeof::Context<F>> {
+    async fn sizeof<'c>(&self, ctx: &'c mut sizeof::Context<F>) -> Result<&'c mut sizeof::Context<F>> {
         let store = EmptyLinkStore::<F, <Link as HasLink>::Rel, ()>::default();
         let mac = Mac(spongos::MacSize::<F>::USIZE);
         ctx.join(&store, self.link)?
@@ -76,6 +81,7 @@ where
     }
 }
 
+#[async_trait]
 impl<'a, F, Link, Store> message::ContentWrap<F, Store> for ContentWrap<'a, F, Link>
 where
     F: PRP,
@@ -83,7 +89,7 @@ where
     <Link as HasLink>::Rel: 'a + Eq + SkipFallback<F>,
     Store: LinkStore<F, <Link as HasLink>::Rel>,
 {
-    fn wrap<'c, OS: io::OStream>(
+    async fn wrap<'c, OS: io::OStream>(
         &self,
         store: &Store,
         ctx: &'c mut wrap::Context<F, OS>,
@@ -122,6 +128,7 @@ where
     }
 }
 
+#[async_trait]
 impl<F, Link, Store> message::ContentUnwrap<F, Store> for ContentUnwrap<F, Link>
 where
     F: PRP,
@@ -129,9 +136,9 @@ where
     <Link as HasLink>::Rel: Eq + Default + SkipFallback<F>,
     Store: LinkStore<F, <Link as HasLink>::Rel>,
 {
-    fn unwrap<'c, IS: io::IStream>(
+    async fn unwrap<'c, IS: io::IStream>(
         &mut self,
-        store: &Store,
+        store: &'c Store,
         ctx: &'c mut unwrap::Context<F, IS>,
     ) -> Result<&'c mut unwrap::Context<F, IS>> {
         let mac = Mac(spongos::MacSize::<F>::USIZE);

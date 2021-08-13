@@ -95,7 +95,7 @@ where
 {
     fn unwrap<'c, IS: io::IStream<TW>>(
         &mut self,
-        store: &Store,
+        store: &'c Store,
         ctx: &'c mut unwrap::Context<TW, F, IS>,
     ) -> Result<&'c mut unwrap::Context<TW, F, IS>> {
         let mac = Mac(spongos::Spongos::<TW, F>::MAC_SIZE);

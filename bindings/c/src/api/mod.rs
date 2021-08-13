@@ -27,6 +27,9 @@ use iota_streams::{
     },
 };
 
+#[cfg(not(feature = "client"))]
+use iota_streams::core::futures::executor::block_on;
+
 use core::ptr::{
     null,
     null_mut,
@@ -140,11 +143,19 @@ pub extern "C" fn drop_unwrapped_messages(ms: *const UnwrappedMessages) {
     safe_drop_ptr(ms)
 }
 
-#[cfg(feature = "sync-client")]
+#[cfg(feature = "client")]
 pub type TransportWrap = iota_streams::app::transport::tangle::client::Client;
 
-#[cfg(not(feature = "sync-client"))]
-pub type TransportWrap = Rc<core::cell::RefCell<BucketTransport>>;
+#[cfg(not(feature = "client"))]
+pub type TransportWrap = Arc<Mutex<BucketTransport>>;
+
+pub fn run_async<R>(fut: impl Future<Output=R>) -> R {
+    #[cfg(feature = "client")]
+    let ret = tokio::runtime::Runtime::new().unwrap().block_on(fut);
+    #[cfg(not(feature = "client"))]
+    let ret = block_on(fut);
+    ret
+}
 
 #[no_mangle]
 pub extern "C" fn transport_new() -> *mut TransportWrap {
@@ -156,14 +167,14 @@ pub extern "C" fn transport_drop(tsp: *mut TransportWrap) {
     safe_drop_mut_ptr(tsp)
 }
 
-#[cfg(feature = "sync-client")]
+#[cfg(feature = "client")]
 #[no_mangle]
 pub unsafe extern "C" fn transport_client_new_from_url(c_url: *const c_char) -> *mut TransportWrap {
     let url = CStr::from_ptr(c_url).to_str().unwrap();
     safe_into_mut_ptr(TransportWrap::new_from_url(url))
 }
 
-#[cfg(feature = "sync-client")]
+#[cfg(feature = "client")]
 mod client_details {
     use super::*;
     use iota_streams::app::transport::{
@@ -328,7 +339,7 @@ mod client_details {
         r.as_mut().map_or(Err::NullArgument, |r| {
             tsp.as_mut().map_or(Err::NullArgument, |tsp| {
                 link.as_ref().map_or(Err::NullArgument, |link| {
-                    tsp.get_link_details(link).map_or(Err::OperationFailed, |d| {
+                    run_async(tsp.get_link_details(link)).map_or(Err::OperationFailed, |d| {
                         *r = d.into();
                         Err::Ok
                     })
@@ -338,7 +349,7 @@ mod client_details {
     }
 }
 
-#[cfg(feature = "sync-client")]
+#[cfg(feature = "client")]
 pub use client_details::*;
 
 #[repr(C)]
@@ -605,3 +616,4 @@ pub use auth::*;
 
 mod sub;
 pub use sub::*;
+use core::future::Future;

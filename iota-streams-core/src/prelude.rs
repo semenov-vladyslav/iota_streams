@@ -48,6 +48,11 @@ pub use std::{
     },
 };
 
+pub use spin::{
+    Mutex,
+    MutexGuard,
+};
+
 pub use hashbrown::{
     hash_map,
     hash_set,

@@ -1,13 +1,13 @@
-use core::{
-    cell::RefMut,
-    fmt,
-};
+use core::fmt;
 use iota_streams_core::Result;
 
 use super::*;
-use iota_streams_core::sponge::{
-    prp::PRP,
-    spongos::Spongos,
+use iota_streams_core::{
+    prelude::MutexGuard,
+    sponge::{
+        prp::PRP,
+        spongos::Spongos,
+    },
 };
 use iota_streams_ddml::link_store::LinkStore;
 
@@ -21,7 +21,7 @@ impl<F: PRP, Link: HasLink> WrapState<F, Link> {
     /// Save link for the current wrapped message and accociated info into the store.
     pub fn commit<Store>(
         mut self,
-        mut store: RefMut<Store>,
+        store: &mut MutexGuard<Store>,
         info: <Store as LinkStore<F, <Link as HasLink>::Rel>>::Info,
     ) -> Result<Link>
     where
