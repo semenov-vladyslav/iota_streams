@@ -37,7 +37,7 @@ chrono = { version = "0.4.11", default-features = false, optional = true }
 hex = { version = "0.4", default-features = false, optional = false }
 
 # Dependencies for "client" feature
-iota-client = { git = "https://github.com/iotaledger/iota.rs", rev  = "283af58b6f9a20b3698e5128e3e651b2a4dce861", default-features = false, optional = true }
+iota-client = { git = "https://github.com/iotaledger/iota.rs", branch  = "wasm", default-features = false, optional = true }
 
 num_cpus = { version = "1.10", optional = true }
 
