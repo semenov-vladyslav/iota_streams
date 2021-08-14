@@ -14,7 +14,7 @@ use iota_streams_core::{
 #[cfg(feature = "async")]
 use iota_streams_core::Errors::MessageNotUnique;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct BucketTransport<Link, Msg> {
     bucket: HashMap<Link, Vec<Msg>>,
 }

@@ -9,7 +9,7 @@ use iota_streams_core::{
     sponge::prp::PRP,
 };
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct KeccakF1600 {
     state: [u64; 25],
 }

@@ -86,10 +86,7 @@ pub fn msg_from_tangle_message<F>(message: &Message, link: &TangleAddress) -> Re
         }
 
         let binary = BinaryMessage::new(link.clone(), TangleAddress::default(), bytes.into());
-        // TODO get timestamp
-        let timestamp: u64 = 0;
-
-        Ok(TangleMessage { binary, timestamp })
+        Ok(binary)
     } else {
         err!(BadMessagePayload)
     }
@@ -115,11 +112,10 @@ async fn get_messages(client: &iota_client::Client, tx_address: &[u8], tx_tag: &
 
 /// Send a message to the Tangle using a node client
 pub async fn async_send_message_with_options<F>(client: &iota_client::Client, msg: &TangleMessage<F>) -> Result<()> {
-    let hash = get_hash(msg.binary.link.appinst.as_ref(), msg.binary.link.msgid.as_ref())?;
-    let binary = &msg.binary;
+    let hash = get_hash(msg.link.appinst.as_ref(), msg.link.msgid.as_ref())?;
 
     let mut bytes = Vec::<u8>::new();
-    for b in &binary.body.bytes {
+    for b in &msg.body.bytes {
         bytes.push(*b);
     }
 
@@ -280,7 +276,7 @@ impl TransportDetails<TangleAddress> for Client {
 
 #[cfg(not(feature = "async"))]
 impl<F> Transport<TangleAddress, TangleMessage<F>> for Client {
-    /// Send a Streams message over the Tangle with the current timestamp and default SendOptions.
+    /// Send a Streams message over the Tangle with default SendOptions.
     fn send_message(&mut self, msg: &TangleMessage<F>) -> Result<()> {
         sync_send_message_with_options(&self.client, msg)
     }
@@ -297,7 +293,7 @@ impl<F> Transport<TangleAddress, TangleMessage<F>> for Client
 where
     F: 'static + core::marker::Send + core::marker::Sync,
 {
-    /// Send a Streams message over the Tangle with the current timestamp and default SendOptions.
+    /// Send a Streams message over the Tangle with default SendOptions.
     async fn send_message(&mut self, msg: &TangleMessage<F>) -> Result<()> {
         async_send_message_with_options(&self.client, msg).await
     }
@@ -346,7 +342,7 @@ impl<F> Transport<TangleAddress, TangleMessage<F>> for Rc<RefCell<Client>>
 where
     F: 'static + core::marker::Send + core::marker::Sync,
 {
-    /// Send a Streams message over the Tangle with the current timestamp and default SendOptions.
+    /// Send a Streams message over the Tangle with default SendOptions.
     async fn send_message(&mut self, msg: &TangleMessage<F>) -> Result<()> {
         match (&*self).try_borrow_mut() {
             Ok(tsp) => async_send_message_with_options(&tsp.client, msg).await,

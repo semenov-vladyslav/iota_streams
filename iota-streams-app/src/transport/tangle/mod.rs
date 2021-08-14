@@ -53,89 +53,10 @@ use crate::{
         Cursor,
         HasLink,
         LinkGenerator,
-        LinkedMessage,
     },
 };
 
-/// Number of bytes to be placed in each transaction (Maximum HDF Payload Count)
-pub const PAYLOAD_BYTES: usize = 1090;
-
-/// Wrapper for a tangle formatted message
-#[derive(Clone)]
-pub struct TangleMessage<F> {
-    /// Encapsulated binary encoded message.
-    pub binary: BinaryMessage<F, TangleAddress>,
-
-    /// Timestamp is not an intrinsic part of Streams message; it's a part of the bundle.
-    /// Timestamp is checked with Kerl as part of bundle essense trits.
-    pub timestamp: u64,
-}
-
-impl<F> LinkedMessage<TangleAddress> for TangleMessage<F> {
-    fn link(&self) -> &TangleAddress {
-        self.binary.link()
-    }
-    fn prev_link(&self) -> &TangleAddress {
-        self.binary.prev_link()
-    }
-}
-
-// TODO: Use better feature to detect `chrono::Utc::new()`.
-#[cfg(all(feature = "std"))] //, not(feature = "wasmbind")
-                             //#[cfg(all(feature = "std"))]
-impl<F> TangleMessage<F> {
-    /// Create TangleMessage from BinaryMessage and add the current timestamp.
-    pub fn new(msg: BinaryMessage<F, TangleAddress>) -> Self {
-        Self {
-            binary: msg,
-            timestamp: chrono::Utc::now().timestamp_millis() as u64,
-        }
-    }
-}
-
-// #[cfg(feature = "wasmbind")]
-// impl<F> TangleMessage<F> {
-// Create TangleMessage from BinaryMessage and add the current timestamp.
-// pub fn new(msg: BinaryMessage<F, TangleAddress>) -> Self {
-// let timestamp = js_sys::Date::new_0().value_of() as u64;
-// Self {
-// binary: msg,
-// timestamp,
-// }
-// }
-// }
-// #[cfg(feature = "wasmbind")]
-// impl<F> TangleMessage<F> {
-// Create TangleMessage from BinaryMessage and add the current timestamp.
-// pub fn new(msg: BinaryMessage<F, TangleAddress>) -> Self {
-// Self {
-// binary: msg,
-// timestamp: wasm_timer::SystemTime::now()
-// .duration_since(wasm_timer::SystemTime::UNIX_EPOCH)
-// .unwrap()
-// .as_millis() as u64,
-// }
-// }
-// }
-
-//#[cfg(all(not(feature = "std"), not(feature = "wasmbind")))]
-#[cfg(not(feature = "std"))]
-impl<F> TangleMessage<F> {
-    /// Create TangleMessage from BinaryMessage and add the current timestamp.
-    pub fn new(msg: BinaryMessage<F, TangleAddress>) -> Self {
-        Self {
-            binary: msg,
-            timestamp: 0_u64,
-        }
-    }
-}
-
-impl<F> TangleMessage<F> {
-    /// Create TangleMessage from BinaryMessage and an explicit timestamp.
-    pub fn with_timestamp(msg: BinaryMessage<F, TangleAddress>, timestamp: u64) -> Self {
-        Self { binary: msg, timestamp }
-    }
-}
+pub type TangleMessage<F> = BinaryMessage<F, TangleAddress>;
 
 /// Tangle representation of a Message Link
 #[derive(Clone)]

@@ -89,6 +89,7 @@ pub use msginfo::MsgInfo;
 
 /// Message body returned as part of handle message routine.
 #[allow(clippy::large_enum_variant)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MessageContent {
     Announce,
     Keyload,

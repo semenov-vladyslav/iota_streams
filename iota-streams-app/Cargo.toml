@@ -11,16 +11,16 @@ description = "A rust implementation of the IOTA Streams applications"
 [features]
 default = ["std", "tangle", "sync-client"]
 # Enable `std` feature in dependencies
-std = ["iota-streams-core/std", "iota-streams-core-edsig/std", "iota-streams-ddml/std", "chrono/std", "chrono/clock", "hex/std"]
+std = ["iota-streams-core/std", "iota-streams-core-edsig/std", "iota-streams-ddml/std", "hex/std"]
 # rust doesn't support async traits, `async-trait` crate emulates `async` keyword
 # `async` implies `std` for now
 async = ["async-trait", "atomic_refcell"]
-tangle = ["chrono"]
+tangle = []
 # `iota-client` support is implemented as a feature (as opposed to a separate crate) in order to
 # implement Transport for iota_client::Client.
-sync-client = ["num_cpus", "iota-client/sync", "tangle", "std"]
-async-client = ["num_cpus", "iota-client/default", "tangle", "async", "std"]
-wasm-client = ["iota-client/wasm", "chrono/wasmbind", "tangle", "async", "std"]
+sync-client = ["num_cpus", "iota-client/sync", "tangle", "std", "futures"]
+async-client = ["num_cpus", "iota-client/default", "tangle", "async", "std", "futures"]
+wasm-client = ["iota-client/wasm", "tangle", "async", "std", "rand/wasm-bindgen", "futures"]
 
 [lib]
 name = "iota_streams_app"
@@ -31,20 +31,21 @@ iota-streams-core = { version = "0.3.1", path = "../iota-streams-core", default-
 iota-streams-core-edsig = { version = "0.2.1", path = "../iota-streams-core-edsig", default-features = false }
 iota-streams-ddml = { version = "0.2.1", path = "../iota-streams-ddml", default-features = false }
 
-# anyhow and chrono are kept in sync with versions used in iota-client
+# anyhow is kept in sync with versions used in iota-client
 anyhow = { version = "1.0.26", default-features = false }
 wasm-timer = { version = "0.2.5", optional = true }
 js-sys = { version = "0.3.46", optional = true }
-chrono = { version = "0.4.11", default-features = false, optional = true }
 hex = { version = "0.4", default-features = false, optional = false }
 async-trait = { version = "0.1", optional = true }
 atomic_refcell = { version = "0.1.6", optional = true }
+
+rand = { version = "0.7", default-features = false }
 
 # Dependencies for "client" feature
 iota-client = { git = "https://github.com/iotaledger/iota.rs", branch = "dev", default-features = false, optional = true }
 
 num_cpus = { version = "1.10", optional = true }
 
-futures = { version = "0.3.8", default-features = false  }
+futures = { version = "0.3.8", default-features = false, optional = true }
 cstr_core = { version = "0.2.2", default-features = false, features = ["alloc"] }
 cty = { version = "0.2.1" }

@@ -194,7 +194,7 @@ impl<Trans: Transport + Clone> User<Trans> {
     /// * `wrapped` - A wrapped sequence object containing the sequence message and state
     fn send_sequence(&mut self, wrapped: WrappedSequence) -> Result<Option<Address>> {
         if let Some(seq_msg) = wrapped.0 {
-            self.transport.send_message(&Message::new(seq_msg))?;
+            self.transport.send_message(&seq_msg)?;
         }
 
         if let Some(wrap_state) = wrapped.1 {
@@ -206,7 +206,7 @@ impl<Trans: Transport + Clone> User<Trans> {
 
     /// Send a message without using sequencing logic. Reserved for Announce and Subscribe messages
     fn send_message(&mut self, msg: WrappedMessage, info: MsgInfo) -> Result<Address> {
-        self.transport.send_message(&Message::new(msg.message))?;
+        self.transport.send_message(&msg.message)?;
         self.commit_wrapped(msg.wrapped, info)
     }
 
@@ -223,7 +223,7 @@ impl<Trans: Transport + Clone> User<Trans> {
         info: MsgInfo,
     ) -> Result<(Address, Option<Address>)> {
         let seq = self.user.wrap_sequence(ref_link)?;
-        self.transport.send_message(&Message::new(msg.message))?;
+        self.transport.send_message(&msg.message)?;
         let seq_link = self.send_sequence(seq)?;
         let msg_link = self.commit_wrapped(msg.wrapped, info)?;
         Ok((msg_link, seq_link))
@@ -314,7 +314,7 @@ impl<Trans: Transport + Clone> User<Trans> {
     pub fn receive_sequence(&mut self, link: &Address) -> Result<Address> {
         let msg = self.transport.recv_message(link)?;
         if let Some(_addr) = &self.user.appinst {
-            let seq_msg = self.user.handle_sequence(msg.binary, MsgInfo::Sequence, true)?.body;
+            let seq_msg = self.user.handle_sequence(msg, MsgInfo::Sequence, true)?.body;
             let msg_id = self.user.link_gen.link_from(
                 &seq_msg.id,
                 Cursor::new_at(&seq_msg.ref_link, 0, seq_msg.seq_num.0 as u32),
@@ -332,8 +332,7 @@ impl<Trans: Transport + Clone> User<Trans> {
     ///  * `link` - Address of the message to be processed
     pub fn receive_signed_packet(&mut self, link: &Address) -> Result<(PublicKey, Bytes, Bytes)> {
         let msg = self.transport.recv_message(link)?;
-        // TODO: msg.timestamp is lost
-        let m = self.user.handle_signed_packet(msg.binary, MsgInfo::SignedPacket)?;
+        let m = self.user.handle_signed_packet(msg, MsgInfo::SignedPacket)?;
         Ok(m.body)
     }
 
@@ -343,7 +342,7 @@ impl<Trans: Transport + Clone> User<Trans> {
     ///  * `link` - Address of the message to be processed
     pub fn receive_tagged_packet(&mut self, link: &Address) -> Result<(Bytes, Bytes)> {
         let msg = self.transport.recv_message(link)?;
-        let m = self.user.handle_tagged_packet(msg.binary, MsgInfo::TaggedPacket)?;
+        let m = self.user.handle_tagged_packet(msg, MsgInfo::TaggedPacket)?;
         Ok(m.body)
     }
 
@@ -353,8 +352,7 @@ impl<Trans: Transport + Clone> User<Trans> {
     ///  * `link` - Address of the message to be processed
     pub fn receive_subscribe(&mut self, link: &Address) -> Result<()> {
         let msg = self.transport.recv_message(link)?;
-        // TODO: Timestamp is lost.
-        self.user.handle_subscribe(msg.binary, MsgInfo::Subscribe)
+        self.user.handle_subscribe(msg, MsgInfo::Subscribe)
     }
 
     /// Receive and Process an announcement message [Subscriber].
@@ -363,7 +361,7 @@ impl<Trans: Transport + Clone> User<Trans> {
     /// * `link_to` - Address of the Channel Announcement message
     pub fn receive_announcement(&mut self, link: &Address) -> Result<()> {
         let msg = self.transport.recv_message(link)?;
-        self.user.handle_announcement(msg.binary, MsgInfo::Announce)
+        self.user.handle_announcement(msg, MsgInfo::Announce)
     }
 
     /// Receive and process a keyload message [Subscriber].
@@ -372,7 +370,7 @@ impl<Trans: Transport + Clone> User<Trans> {
     ///  * `link` - Address of the message to be processed
     pub fn receive_keyload(&mut self, link: &Address) -> Result<bool> {
         let msg = self.transport.recv_message(link)?;
-        let m = self.user.handle_keyload(msg.binary, MsgInfo::Keyload)?;
+        let m = self.user.handle_keyload(msg, MsgInfo::Keyload)?;
         Ok(m.body)
     }
 
@@ -418,7 +416,7 @@ impl<Trans: Transport + Clone> User<Trans> {
     /// * `link` - Address of message to act as root of previous message fetching
     pub fn fetch_prev_msg(&mut self, link: &Address) -> Result<UnwrappedMessage> {
         let msg = self.transport.recv_message(link)?;
-        let header = msg.binary.parse_header()?.header;
+        let header = msg.parse_header()?.header;
 
         let prev_msg_link = Address::from_bytes(&header.previous_msg_link.0);
         let prev_msg = self.transport.recv_message(&prev_msg_link)?;
@@ -440,7 +438,7 @@ impl<Trans: Transport + Clone> User<Trans> {
         for _ in 0..max {
             msg_info = self.parse_msg_info(&msg_info.0)?;
             if msg_info.1 == message::SEQUENCE {
-                let msg_link = self.process_sequence(msg_info.2.binary, false)?;
+                let msg_link = self.process_sequence(msg_info.2, false)?;
                 msg_info = self.parse_msg_info(&msg_link)?;
             }
             to_process.push(msg_info.2);
@@ -464,8 +462,7 @@ impl<Trans: Transport + Clone> User<Trans> {
     pub fn handle_message(&mut self, mut msg0: Message, store: bool) -> Result<UnwrappedMessage> {
         let mut sequenced = false;
         loop {
-            // Forget TangleMessage and timestamp
-            let msg = msg0.binary;
+            let msg = msg0;
             let preparsed = msg.parse_header()?;
             let link = preparsed.header.link.clone();
             let prev_link = TangleAddress::from_bytes(&preparsed.header.previous_msg_link.0);
@@ -509,7 +506,7 @@ impl<Trans: Transport + Clone> User<Trans> {
     // Get the previous msg link and msg type from header of message
     fn parse_msg_info(&mut self, link: &Address) -> Result<(Address, u8, Message)> {
         let msg = self.transport.recv_message(link)?;
-        let header = msg.binary.parse_header()?.header;
+        let header = msg.parse_header()?.header;
         let link = Address::from_bytes(&header.previous_msg_link.0);
         Ok((link, header.content_type, msg))
     }
@@ -526,7 +523,7 @@ impl<Trans: Transport + Clone> User<Trans> {
     /// * `wrapped` - A wrapped sequence object containing the sequence message and state
     async fn send_sequence(&mut self, wrapped: WrappedSequence) -> Result<Option<Address>> {
         if let Some(seq_msg) = wrapped.0 {
-            self.transport.send_message(&Message::new(seq_msg)).await?;
+            self.transport.send_message(&seq_msg).await?;
         }
 
         if let Some(wrap_state) = wrapped.1 {
@@ -538,7 +535,7 @@ impl<Trans: Transport + Clone> User<Trans> {
 
     /// Send a message without using sequencing logic. Reserved for Announce and Subscribe messages
     async fn send_message(&mut self, msg: WrappedMessage, info: MsgInfo) -> Result<Address> {
-        self.transport.send_message(&Message::new(msg.message)).await?;
+        self.transport.send_message(&msg.message).await?;
         self.commit_wrapped(msg.wrapped, info)
     }
 
@@ -555,7 +552,7 @@ impl<Trans: Transport + Clone> User<Trans> {
         info: MsgInfo,
     ) -> Result<(Address, Option<Address>)> {
         let seq = self.user.wrap_sequence(ref_link)?;
-        self.transport.send_message(&Message::new(msg.message)).await?;
+        self.transport.send_message(&msg.message).await?;
         let seq_link = self.send_sequence(seq).await?;
         let msg_link = self.commit_wrapped(msg.wrapped, info)?;
         Ok((msg_link, seq_link))
@@ -648,7 +645,7 @@ impl<Trans: Transport + Clone> User<Trans> {
     pub async fn receive_sequence(&mut self, link: &Address) -> Result<Address> {
         let msg = self.transport.recv_message(link).await?;
         if let Some(_addr) = &self.user.appinst {
-            let seq_msg = self.user.handle_sequence(msg.binary, MsgInfo::Sequence, true)?.body;
+            let seq_msg = self.user.handle_sequence(msg, MsgInfo::Sequence, true)?.body;
             let msg_id = self.user.link_gen.link_from(
                 &seq_msg.id,
                 Cursor::new_at(&seq_msg.ref_link, 0, seq_msg.seq_num.0 as u32),
@@ -666,8 +663,7 @@ impl<Trans: Transport + Clone> User<Trans> {
     ///  * `link` - Address of the message to be processed
     pub async fn receive_signed_packet(&mut self, link: &Address) -> Result<(PublicKey, Bytes, Bytes)> {
         let msg = self.transport.recv_message(link).await?;
-        // TODO: msg.timestamp is lost
-        let m = self.user.handle_signed_packet(msg.binary, MsgInfo::SignedPacket)?;
+        let m = self.user.handle_signed_packet(msg, MsgInfo::SignedPacket)?;
         Ok(m.body)
     }
 
@@ -677,7 +673,7 @@ impl<Trans: Transport + Clone> User<Trans> {
     ///  * `link` - Address of the message to be processed
     pub async fn receive_tagged_packet(&mut self, link: &Address) -> Result<(Bytes, Bytes)> {
         let msg = self.transport.recv_message(link).await?;
-        let m = self.user.handle_tagged_packet(msg.binary, MsgInfo::TaggedPacket)?;
+        let m = self.user.handle_tagged_packet(msg, MsgInfo::TaggedPacket)?;
         Ok(m.body)
     }
 
@@ -687,8 +683,7 @@ impl<Trans: Transport + Clone> User<Trans> {
     ///  * `link` - Address of the message to be processed
     pub async fn receive_subscribe(&mut self, link: &Address) -> Result<()> {
         let msg = self.transport.recv_message(link).await?;
-        // TODO: Timestamp is lost.
-        self.user.handle_subscribe(msg.binary, MsgInfo::Subscribe)
+        self.user.handle_subscribe(msg, MsgInfo::Subscribe)
     }
 
     /// Receive and Process an announcement message [Subscriber].
@@ -697,7 +692,7 @@ impl<Trans: Transport + Clone> User<Trans> {
     /// * `link_to` - Address of the Channel Announcement message
     pub async fn receive_announcement(&mut self, link: &Address) -> Result<()> {
         let msg = self.transport.recv_message(link).await?;
-        self.user.handle_announcement(msg.binary, MsgInfo::Announce)
+        self.user.handle_announcement(msg, MsgInfo::Announce)
     }
 
     /// Receive and process a keyload message [Subscriber].
@@ -706,7 +701,7 @@ impl<Trans: Transport + Clone> User<Trans> {
     ///  * `link` - Address of the message to be processed
     pub async fn receive_keyload(&mut self, link: &Address) -> Result<bool> {
         let msg = self.transport.recv_message(link).await?;
-        let m = self.user.handle_keyload(msg.binary, MsgInfo::Keyload)?;
+        let m = self.user.handle_keyload(msg, MsgInfo::Keyload)?;
         Ok(m.body)
     }
 
@@ -753,7 +748,7 @@ impl<Trans: Transport + Clone> User<Trans> {
     /// * `link` - Address of message to act as root of previous message fetching
     pub async fn fetch_prev_msg(&mut self, link: &Address) -> Result<UnwrappedMessage> {
         let msg = self.transport.recv_message(link).await?;
-        let header = msg.binary.parse_header()?.header;
+        let header = msg.parse_header()?.header;
 
         let prev_msg_link = Address::from_bytes(&header.previous_msg_link.0);
         let prev_msg = self.transport.recv_message(&prev_msg_link).await?;
@@ -773,7 +768,7 @@ impl<Trans: Transport + Clone> User<Trans> {
         for _ in 0..max {
             msg_info = self.parse_msg_info(&msg_info.0).await?;
             if msg_info.1 == message::SEQUENCE {
-                let msg_link = self.process_sequence(msg_info.2.binary, false)?;
+                let msg_link = self.process_sequence(msg_info.2, false)?;
                 msg_info = self.parse_msg_info(&msg_link).await?;
             }
             to_process.push(msg_info.2);
@@ -796,8 +791,7 @@ impl<Trans: Transport + Clone> User<Trans> {
     pub async fn handle_message(&mut self, mut msg0: Message, store: bool) -> Result<UnwrappedMessage> {
         let mut sequenced = false;
         loop {
-            // Forget TangleMessage and timestamp
-            let msg = msg0.binary;
+            let msg = msg0;
             let preparsed = msg.parse_header()?;
             let link = preparsed.header.link.clone();
             let prev_link = TangleAddress::from_bytes(&preparsed.header.previous_msg_link.0);
@@ -842,7 +836,7 @@ impl<Trans: Transport + Clone> User<Trans> {
     /// the message itself
     async fn parse_msg_info(&mut self, link: &Address) -> Result<(Address, u8, Message)> {
         let msg = self.transport.recv_message(link).await?;
-        let header = msg.binary.parse_header()?.header;
+        let header = msg.parse_header()?.header;
         let link = Address::from_bytes(&header.previous_msg_link.0);
         Ok((link, header.content_type, msg))
     }

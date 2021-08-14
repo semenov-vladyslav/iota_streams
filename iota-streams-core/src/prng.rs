@@ -35,31 +35,36 @@ where
 pub type Nonce = GenericArray<u8, U16>;
 
 /// Generate a random nonce.
-#[cfg(feature = "std")]
 pub fn random_nonce() -> Nonce {
-    random_bytes::<rand::rngs::ThreadRng, U16>(&mut rand::thread_rng())
-}
-
-#[cfg(not(feature = "std"))]
-pub fn random_nonce() -> Nonce {
-    // TODO: Set default global RNG for `no_std` environment.
-    // Use Rng and init with entropy.
-    panic!("No default global RNG present.");
+    random_bytes(&mut rng())
 }
 
 pub type Key = GenericArray<u8, U32>;
 
 /// Generate a random key.
-#[cfg(feature = "std")]
 pub fn random_key() -> Key {
-    random_bytes::<rand::rngs::ThreadRng, U32>(&mut rand::thread_rng())
+    random_bytes(&mut rng())
+}
+
+#[cfg(all(feature = "std", not(target_os = "espidf")))]
+pub fn rng() -> rand::rngs::ThreadRng {
+    rand::thread_rng()
+}
+
+// ESPIDF targets (ESP32 family) have std available through-ESP-IDF but
+// pthread_atfork is not implemented, which is necessary to get the thread handle
+// by rand::thread_rng(). Instead, we use a one-off StdRng instance seeded
+// with `getrandom` (`esp_fill_random`). Given the coldness of this
+// function (at least in streams-channels) in practice this approach has a
+// similar security and performance as ThreadRng.
+#[cfg(all(feature = "std", target_os = "espidf"))]
+pub fn rng() -> rand::rngs::StdRng {
+    <rand::rngs::StdRng as rand::SeedableRng>::from_entropy()
 }
 
 #[cfg(not(feature = "std"))]
-pub fn random_key() -> Key {
-    // TODO: Set default global RNG for `no_std` environment.
-    // Use Rng and init with entropy.
-    panic!("No default global RNG present.");
+pub fn rng() -> rand::rngs::StdRng {
+    unimplemented!("No default global RNG present.");
 }
 
 /// Prng fixed key size.

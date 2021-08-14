@@ -62,7 +62,7 @@ impl<F> From<Vec<u8>> for BinaryBody<F> {
 impl<F, Link> BinaryMessage<F, Link>
 where
     F: PRP,
-    Link: Clone + AbsorbExternalFallback<F> + HasLink + std::fmt::Debug,
+    Link: Clone + AbsorbExternalFallback<F> + HasLink + fmt::Debug,
 {
     pub fn parse_header(&self) -> Result<PreparsedMessage<F, Link>> {
         let mut ctx = unwrap::Context::new(&self.body.bytes[..]);
