@@ -237,8 +237,10 @@ impl Subscriber {
         self.subscriber
             .borrow_mut()
             .receive_msg_by_sequence(
-                &anchor_link.try_into().map_or_else(|_err| ApiAddress::default(), |addr| addr),
-                msg_num
+                &anchor_link
+                    .try_into()
+                    .map_or_else(|_err| ApiAddress::default(), |addr| addr),
+                msg_num,
             )
             .await
             .map_or_else(
@@ -247,7 +249,7 @@ impl Subscriber {
                     let msgs = vec![msg];
                     let response = get_message_contents(msgs);
                     Ok(response[0].copy())
-                }
+                },
             )
     }
 

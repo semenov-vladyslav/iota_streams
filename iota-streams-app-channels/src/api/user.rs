@@ -1045,10 +1045,9 @@ where
     pub fn fetch_anchor(&self) -> Result<&Cursor<Link>> {
         match &self.anchor {
             Some(anchor) => Ok(anchor),
-            None => err(UserNotRegistered)
+            None => err(UserNotRegistered),
         }
     }
-
 }
 
 impl<F, Link, LG, LS, Keys> ContentSizeof<F> for User<F, Link, LG, LS, Keys>
