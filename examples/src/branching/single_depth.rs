@@ -30,7 +30,8 @@ pub fn example<T: Transport>(transport: Rc<RefCell<T>>, channel_impl: ChannelTyp
     println!("Author single depth?: {}", author.is_single_depth());
 
     let mut subscriberA = Subscriber::new("SUBSCRIBERA9SEED", transport.clone());
-    let mut subscriberB = Subscriber::new("SUBSCRIBERB9SEED", transport);
+    let mut subscriberB = Subscriber::new("SUBSCRIBERB9SEED", transport.clone());
+    let mut subscriberC = Subscriber::new("SUBSCRIBERC9SEED", transport);
 
     let empty_payload = Bytes(Vec::new());
 
@@ -142,9 +143,14 @@ pub fn example<T: Transport>(transport: Rc<RefCell<T>>, channel_impl: ChannelTyp
     let msg = subscriberB.receive_msg_by_sequence(&anchor_msg_link, 5)?;
     if let MessageContent::SignedPacket {pk: _, public_payload: _, masked_payload } = &msg.body {
         println!("  Msg => <{}>: {}", msg.link, String::from_utf8(masked_payload.0.to_vec())?);
+        assert_eq!(masked_payload.0, "Message 5".as_bytes().to_vec());
     } else {
         panic!("Packet found was not a signed packet from author")
     }
 
+    println!("\nSubscriber C trying to fetch message 5");
+    let msg = subscriberC.receive_msg_by_sequence(&anchor_msg_link, 5);
+    try_or!(msg.is_err(), SubscriberAccessMismatch("C".to_string()))?;
+    println!("Subscriber C failed to read message, as intended\n");
     Ok(())
 }

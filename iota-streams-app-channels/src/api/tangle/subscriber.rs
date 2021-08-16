@@ -315,6 +315,12 @@ impl<Trans: Transport + Clone> Subscriber<Trans> {
         self.user.receive_message(link)
     }
 
+    /// Receive and process a message with a known anchor link and message number. This can only
+    /// be used if the channel is a single depth channel.
+    ///
+    ///   # Arguments
+    ///   * `anchor_link` - Address of the anchor message for the channel
+    ///   * `msg_num` - Sequence of sent message (not counting announce or any keyloads)
     pub fn receive_msg_by_sequence(&mut self, anchor_link: &Address, msg_num: u32) -> Result<UnwrappedMessage> {
         self.user.receive_msg_by_sequence(anchor_link, msg_num)
     }
@@ -480,6 +486,12 @@ impl<Trans: Transport + Clone> Subscriber<Trans> {
         self.user.receive_message(link).await
     }
 
+    /// Receive and process a message with a known anchor link and message number. This can only
+    /// be used if the channel is a single depth channel.
+    ///
+    ///   # Arguments
+    ///   * `anchor_link` - Address of the anchor message for the channel
+    ///   * `msg_num` - Sequence of sent message (not counting announce or any keyloads)
     pub async fn receive_msg_by_sequence(&mut self, anchor_link: &Address, msg_num: u32) -> Result<UnwrappedMessage> {
         self.user.receive_msg_by_sequence(anchor_link, msg_num).await
     }
