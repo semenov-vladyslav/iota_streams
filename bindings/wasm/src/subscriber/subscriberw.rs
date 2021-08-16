@@ -233,6 +233,25 @@ impl Subscriber {
     }
 
     #[wasm_bindgen(catch)]
+    pub async fn receive_msg_by_sequence(self, anchor_link: Address, msg_num: u32) -> Result<UserResponse> {
+        self.subscriber
+            .borrow_mut()
+            .receive_msg_by_sequence(
+                &anchor_link.try_into().map_or_else(|_err| ApiAddress::default(), |addr| addr),
+                msg_num
+            )
+            .await
+            .map_or_else(
+                |err| Err(JsValue::from_str(&err.to_string())),
+                |msg| {
+                    let msgs = vec![msg];
+                    let response = get_message_contents(msgs);
+                    Ok(response[0].copy())
+                }
+            )
+    }
+
+    #[wasm_bindgen(catch)]
     pub async fn send_subscribe(self, link: Address) -> Result<UserResponse> {
         self.subscriber
             .borrow_mut()

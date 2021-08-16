@@ -171,6 +171,15 @@ Receive a message generically without knowing its type.
 | link            | [`address`](#Address)         | Address of the message to be fetched |
 **Returns:** A User Response wrapper around the retrieved message.
 
+#### _async -_ receive_msg_by_sequence(anchor_link, msg_num): [UserResponse](#UserResponse)
+Receive a message by its msg number in an anchored single depth channel.
+
+| Param           | Type                          | Description                          |
+| --------------- | ----------------------------- | ------------------------------------ |
+| anchor_link     | [`address`](#Address)         | Anchor message link for the channel  |
+| msg_num         | `number`                     | Number of the message being retrieved|
+**Returns:** A User Response wrapper around the retrieved message.
+
 #### _async -_ sync_state()
 Synchronise a publishers state prior to sending another message. Retrieves any other messages from the channel 
 to ensure the user state matches all other publishers.
@@ -388,6 +397,15 @@ Receive a message generically without knowing its type.
 | Param           | Type                          | Description                          |
 | --------------- | ----------------------------- | ------------------------------------ |
 | link            | [`address`](#Address)         | Address of the message to be fetched |
+**Returns:** A User Response wrapper around the retrieved message.
+
+#### _async -_ receive_msg_by_sequence(anchor_link, msg_num): [UserResponse](#UserResponse)
+Receive a message by its msg number in an anchored single depth channel.
+
+| Param           | Type                          | Description                          |
+| --------------- | ----------------------------- | ------------------------------------ |
+| anchor_link     | [`address`](#Address)         | Anchor message link for the channel  |
+| msg_num         | `number`                     | Number of the message being retrieved|
 **Returns:** A User Response wrapper around the retrieved message.
 
 #### _async -_ sync_state()
