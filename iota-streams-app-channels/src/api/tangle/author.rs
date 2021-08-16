@@ -304,6 +304,10 @@ impl<Trans: Transport + Clone> Author<Trans> {
     // pub pub fn receive_unsubscribe(&mut self, link: Address) -> Result<()> {
     // self.user.handle_unsubscribe(link, MsgInfo::Unsubscribe)
     // }
+
+    pub fn receive_msg_by_sequence(&mut self, anchor_link: &Address, msg_num: u32) -> Result<UnwrappedMessage> {
+        self.user.receive_msg_by_sequence(anchor_link, msg_num)
+    }
 }
 
 #[cfg(feature = "async")]
@@ -482,6 +486,10 @@ impl<Trans: Transport + Clone> Author<Trans> {
     // pub async fn receive_unsubscribe(&mut self, link: Address) -> Result<()> {
     // self.user.handle_unsubscribe(link, MsgInfo::Unsubscribe).await
     // }
+
+    pub async fn receive_msg_by_sequence(&mut self, anchor_link: &Address, msg_num: u32) -> Result<UnwrappedMessage> {
+        self.user.receive_msg_by_sequence(anchor_link, msg_num).await
+    }
 }
 
 impl<Trans: Clone> fmt::Display for Author<Trans> {

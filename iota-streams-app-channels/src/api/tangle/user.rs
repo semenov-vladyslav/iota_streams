@@ -16,6 +16,7 @@ use iota_streams_core::{
     try_or,
     Errors::{
         ChannelDuplication,
+        ChannelNotSingleDepth,
         UnknownMsgType,
         UserNotRegistered,
     },
@@ -513,6 +514,22 @@ impl<Trans: Transport + Clone> User<Trans> {
         let link = Address::from_bytes(&header.previous_msg_link.0);
         Ok((link, header.content_type, msg))
     }
+
+    pub fn receive_msg_by_sequence(&mut self, anchor_link: &Address, msg_num: u32) -> Result<UnwrappedMessage> {
+        if !self.is_single_depth() {
+            return err(ChannelNotSingleDepth);
+        }
+        match self.author_public_key() {
+            Some(pk) => {
+                // Add 1 to msg_num because messages start from sequence number 2
+                let cursor = Cursor::new_at(anchor_link.rel(), 0, msg_num + 2_u32);
+                let link = self.user.link_gen.link_from(&(*pk).into(), cursor);
+                let msg = self.transport.recv_message(&link)?;
+                self.handle_message(msg, false)
+            }
+            None => err(UserNotRegistered),
+        }
+    }
 }
 
 #[cfg(feature = "async")]
@@ -845,5 +862,21 @@ impl<Trans: Transport + Clone> User<Trans> {
         let header = msg.binary.parse_header()?.header;
         let link = Address::from_bytes(&header.previous_msg_link.0);
         Ok((link, header.content_type, msg))
+    }
+
+    pub async fn receive_msg_by_sequence(&mut self, anchor_link: &Address, msg_num: u32) -> Result<UnwrappedMessage> {
+        if !self.is_single_depth() {
+            return err(ChannelNotSingleDepth);
+        }
+        match self.author_public_key() {
+            Some(pk) => {
+                // Add 2 to msg_num because messages start from sequence number 2
+                let cursor = Cursor::new_at(anchor_link.rel(), 0, msg_num + 2_u32);
+                let link = self.user.link_gen.link_from(&(*pk).into(), cursor);
+                let msg = self.transport.recv_message(&link).await?;
+                self.handle_message(msg, false).await
+            }
+            None => err(UserNotRegistered),
+        }
     }
 }

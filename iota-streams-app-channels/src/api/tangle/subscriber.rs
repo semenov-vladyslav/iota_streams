@@ -1,7 +1,10 @@
 //! Customize Subscriber with default parameters for use over the Tangle.
 
 use core::fmt;
-use iota_streams_core::Result;
+use iota_streams_core::{
+    err,
+    Result,
+};
 
 use super::*;
 use crate::api::tangle::{
@@ -20,6 +23,7 @@ use iota_streams_core::{
         Psk,
         PskId,
     },
+    Errors::SingleDepthOperationFailure,
 };
 use iota_streams_core_edsig::signature::ed25519;
 
@@ -192,6 +196,9 @@ impl<Trans: Transport + Clone> Subscriber<Trans> {
         public_payload: &Bytes,
         masked_payload: &Bytes,
     ) -> Result<(Address, Option<Address>)> {
+        if self.is_single_depth() {
+            return err(SingleDepthOperationFailure);
+        }
         self.user.send_tagged_packet(link_to, public_payload, masked_payload)
     }
 
@@ -207,6 +214,9 @@ impl<Trans: Transport + Clone> Subscriber<Trans> {
         public_payload: &Bytes,
         masked_payload: &Bytes,
     ) -> Result<(Address, Option<Address>)> {
+        if self.is_single_depth() {
+            return err(SingleDepthOperationFailure);
+        }
         self.user.send_signed_packet(link_to, public_payload, masked_payload)
     }
 
@@ -304,6 +314,10 @@ impl<Trans: Transport + Clone> Subscriber<Trans> {
     pub fn receive_msg(&mut self, link: &Address) -> Result<UnwrappedMessage> {
         self.user.receive_message(link)
     }
+
+    pub fn receive_msg_by_sequence(&mut self, anchor_link: &Address, msg_num: u32) -> Result<UnwrappedMessage> {
+        self.user.receive_msg_by_sequence(anchor_link, msg_num)
+    }
 }
 
 #[cfg(feature = "async")]
@@ -343,6 +357,9 @@ impl<Trans: Transport + Clone> Subscriber<Trans> {
         public_payload: &Bytes,
         masked_payload: &Bytes,
     ) -> Result<(Address, Option<Address>)> {
+        if self.is_single_depth() {
+            return err(SingleDepthOperationFailure);
+        }
         self.user
             .send_tagged_packet(link_to, public_payload, masked_payload)
             .await
@@ -360,6 +377,9 @@ impl<Trans: Transport + Clone> Subscriber<Trans> {
         public_payload: &Bytes,
         masked_payload: &Bytes,
     ) -> Result<(Address, Option<Address>)> {
+        if self.is_single_depth() {
+            return err(SingleDepthOperationFailure);
+        }
         self.user
             .send_signed_packet(link_to, public_payload, masked_payload)
             .await
@@ -458,6 +478,10 @@ impl<Trans: Transport + Clone> Subscriber<Trans> {
     ///   * `pk` - Optional ed25519 Public Key of the sending participant. None if unknown
     pub async fn receive_msg(&mut self, link: &Address) -> Result<UnwrappedMessage> {
         self.user.receive_message(link).await
+    }
+
+    pub async fn receive_msg_by_sequence(&mut self, anchor_link: &Address, msg_num: u32) -> Result<UnwrappedMessage> {
+        self.user.receive_msg_by_sequence(anchor_link, msg_num).await
     }
 }
 

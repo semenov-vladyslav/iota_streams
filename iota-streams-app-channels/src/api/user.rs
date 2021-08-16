@@ -679,7 +679,12 @@ where
             .unwrap_signed_packet(preparsed)?
             .commit(self.link_store.borrow_mut(), info)?;
         if !self.is_multi_branching() {
-            self.store_state_for_all(msg.link.rel().clone(), seq_no.0 as u32 + 1)?;
+            let link = if self.is_single_depth() {
+                prev_link.rel().clone()
+            } else {
+                msg.link.rel().clone()
+            };
+            self.store_state_for_all(link, seq_no.0 as u32 + 1)?;
         }
 
         let body = (content.sig_pk, content.public_payload, content.masked_payload);
@@ -762,7 +767,12 @@ where
             .unwrap_tagged_packet(preparsed)?
             .commit(self.link_store.borrow_mut(), info)?;
         if !self.is_multi_branching() {
-            self.store_state_for_all(msg.link.rel().clone(), seq_no.0 as u32 + 1)?;
+            let link = if self.is_single_depth() {
+                prev_link.rel().clone()
+            } else {
+                msg.link.rel().clone()
+            };
+            self.store_state_for_all(link, seq_no.0 as u32 + 1)?;
         }
 
         let body = (content.public_payload, content.masked_payload);
@@ -827,12 +837,13 @@ where
 
                     Ok(WrappedSequence::new().with_cursor(cursor).with_wrapped(wrapped))
                 } else {
-                    let msg_link = self.link_gen.link_from(
-                        &self.sig_kp.public.into(),
-                        Cursor::new_at(&ref_link.clone(), 0, cursor.seq_no),
-                    );
-
-                    cursor.link = msg_link.rel().clone();
+                    if !self.is_single_depth() {
+                        let msg_link = self.link_gen.link_from(
+                            &self.sig_kp.public.into(),
+                            Cursor::new_at(&ref_link.clone(), 0, cursor.seq_no),
+                        );
+                        cursor.link = msg_link.rel().clone();
+                    }
                     Ok(WrappedSequence::new().with_cursor(cursor))
                 }
             }

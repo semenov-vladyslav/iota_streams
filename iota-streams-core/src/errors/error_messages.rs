@@ -144,6 +144,10 @@ pub enum Errors {
     ChannelDuplication,
     /// Subscriber already has a psk stored, cannot add another
     SinglePskAllowance,
+    /// Subscriber send operations are not allowed in Single Depth mode
+    SingleDepthOperationFailure,
+    /// Operation only available on single depth channels
+    ChannelNotSingleDepth,
 
     //////////
     // User Recovery

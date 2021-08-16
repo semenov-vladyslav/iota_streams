@@ -43,6 +43,15 @@ fn run_single_branch_test<T: Transport>(transport: Rc<RefCell<T>>, seed: &str) {
     println!("#######################################");
 }
 
+fn run_single_depth_test<T: Transport>(transport: Rc<RefCell<T>>, seed: &str) {
+    println!("\tRunning Single Branch Test, seed: {}", seed);
+    match branching::single_depth::example(transport, ChannelType::SingleDepth, seed) {
+        Err(err) => println!("Error in Single Depth test: {:?}", err),
+        Ok(_) => println!("\tSingle Depth Test completed!!"),
+    }
+    println!("#######################################");
+}
+
 fn run_multi_branch_test<T: Transport>(transport: Rc<RefCell<T>>, seed: &str) {
     println!("\tRunning Multi Branch Test, seed: {}", seed);
     match branching::multi_branch::example(transport, ChannelType::MultiBranch, seed) {
@@ -76,8 +85,9 @@ fn main_pure() {
 
     let transport = Rc::new(RefCell::new(transport));
     run_single_branch_test(transport.clone(), "PURESEEDA");
-    run_multi_branch_test(transport.clone(), "PURESEEDB");
-    run_recovery_test(transport, "PURESEEDC");
+    run_single_depth_test(transport.clone(), "PURESEEDB");
+    run_multi_branch_test(transport.clone(), "PURESEEDC");
+    run_recovery_test(transport, "PURESEEDD");
     println!("Done running pure tests without accessing Tangle");
     println!("#######################################");
 }
@@ -96,27 +106,23 @@ fn main_client() {
 
     let transport = Rc::new(RefCell::new(client));
 
-    let alph9 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ9";
-    let seed1: &str = &(0..10)
-        .map(|_| alph9.chars().nth(rand::thread_rng().gen_range(0, 27)).unwrap())
-        .collect::<String>();
-    let seed2: &str = &(0..10)
-        .map(|_| alph9.chars().nth(rand::thread_rng().gen_range(0, 27)).unwrap())
-        .collect::<String>();
-    let seed3: &str = &(0..10)
-        .map(|_| alph9.chars().nth(rand::thread_rng().gen_range(0, 27)).unwrap())
-        .collect::<String>();
-
     println!("#######################################");
     println!("Running tests accessing Tangle via node {}", &node_url);
     println!("#######################################");
     println!("\n");
 
-    run_single_branch_test(transport.clone(), seed1);
-    run_multi_branch_test(transport.clone(), seed2);
-    run_recovery_test(transport, seed3);
+    run_single_branch_test(transport.clone(), &new_seed());
+    run_single_depth_test(transport.clone(), &new_seed());
+    run_multi_branch_test(transport.clone(), &new_seed());
+    run_recovery_test(transport, &new_seed());
     println!("Done running tests accessing Tangle via node {}", &node_url);
     println!("#######################################");
+}
+
+fn new_seed() -> String {
+    let alph9 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ9";
+    (0..10).map(|_| alph9.chars().nth(rand::thread_rng().gen_range(0, 27)).unwrap())
+        .collect::<String>()
 }
 
 #[tokio::main]
