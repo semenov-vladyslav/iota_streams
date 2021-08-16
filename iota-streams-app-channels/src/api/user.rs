@@ -160,6 +160,9 @@ where
     pub message_encoding: Vec<u8>,
 
     pub uniform_payload_length: usize,
+
+    /// Anchor message for the channel (can either be an announcement or keyload) - For single depth
+    pub anchor: Option<Cursor<Link>>,
 }
 
 impl<F, Link, LG, LS, Keys> Default for User<F, Link, LG, LS, Keys>
@@ -191,6 +194,7 @@ where
             message_encoding: Vec::new(),
             uniform_payload_length: 0,
             use_psk: false,
+            anchor: None,
         }
     }
 }
@@ -236,6 +240,7 @@ where
             message_encoding,
             uniform_payload_length,
             use_psk: false,
+            anchor: None,
         }
     }
 
@@ -253,6 +258,7 @@ where
         self.key_store
             .insert_cursor(identifier, Cursor::new_at(appinst.rel().clone(), 0, 2_u32))?;
         self.author_sig_pk = Some(self.sig_kp.public);
+        self.anchor = Some(Cursor::new_at(appinst.clone(), 0, 2_u32));
         self.appinst = Some(appinst);
         Ok(())
     }
@@ -353,6 +359,7 @@ where
             .insert_cursor(Identifier::EdPubKey(self.sig_kp.public.into()), cursor)?;
         // Reset link_gen
         self.link_gen.reset(link.clone());
+        self.anchor = Some(Cursor::new_at(link.clone(), 0, 2_u32));
         self.appinst = Some(link);
         self.author_sig_pk = Some(content.sig_pk);
         self.flags = content.flags.0;
@@ -606,6 +613,10 @@ where
         }
         if !self.is_multi_branching() {
             self.store_state_for_all(msg.link.rel().clone(), seq_no.0 as u32 + 1)?;
+            if self.is_single_depth() {
+                println!("Adding seq no {}", seq_no.0);
+                self.anchor = Some(Cursor::new_at(msg.link.clone(), 0, seq_no.0 as u32 + 1));
+            }
         }
 
         Ok(processed)
@@ -679,7 +690,12 @@ where
             .unwrap_signed_packet(preparsed)?
             .commit(self.link_store.borrow_mut(), info)?;
         if !self.is_multi_branching() {
-            self.store_state_for_all(msg.link.rel().clone(), seq_no.0 as u32 + 1)?;
+            let link = if self.is_single_depth() {
+                self.fetch_anchor()?.link.rel().clone()
+            } else {
+                msg.link.rel().clone()
+            };
+            self.store_state_for_all(link, seq_no.0 as u32 + 1)?;
         }
 
         let body = (content.sig_pk, content.public_payload, content.masked_payload);
@@ -762,7 +778,12 @@ where
             .unwrap_tagged_packet(preparsed)?
             .commit(self.link_store.borrow_mut(), info)?;
         if !self.is_multi_branching() {
-            self.store_state_for_all(msg.link.rel().clone(), seq_no.0 as u32 + 1)?;
+            let link = if self.is_single_depth() {
+                self.fetch_anchor()?.link.rel().clone()
+            } else {
+                msg.link.rel().clone()
+            };
+            self.store_state_for_all(link, seq_no.0 as u32 + 1)?;
         }
 
         let body = (content.public_payload, content.masked_payload);
@@ -827,12 +848,13 @@ where
 
                     Ok(WrappedSequence::new().with_cursor(cursor).with_wrapped(wrapped))
                 } else {
-                    let msg_link = self.link_gen.link_from(
-                        &self.sig_kp.public.into(),
-                        Cursor::new_at(&ref_link.clone(), 0, cursor.seq_no),
-                    );
-
-                    cursor.link = msg_link.rel().clone();
+                    if !self.is_single_depth() {
+                        let msg_link = self.link_gen.link_from(
+                            &self.sig_kp.public.into(),
+                            Cursor::new_at(&ref_link.clone(), 0, cursor.seq_no),
+                        );
+                        cursor.link = msg_link.rel().clone();
+                    }
                     Ok(WrappedSequence::new().with_cursor(cursor))
                 }
             }
@@ -1017,6 +1039,14 @@ where
             state.push((*pk, Cursor::new_at(link, *branch_no, *seq_no)))
         }
         Ok(state)
+    }
+
+    /// Fetch the anchor message from the user instance (if it exists). - For use in single depth.
+    pub fn fetch_anchor(&self) -> Result<&Cursor<Link>> {
+        match &self.anchor {
+            Some(anchor) => Ok(anchor),
+            None => err(UserNotRegistered),
+        }
     }
 }
 

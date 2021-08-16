@@ -139,6 +139,7 @@ extern err_t auth_receive_sequence(address_t const **seq, author_t *author, addr
 extern err_t auth_gen_next_msg_ids(next_msg_ids_t const **ids, author_t *author);
 // Generic Processing
 extern err_t auth_receive_msg(unwrapped_message_t const **msg, author_t *author, address_t const *address);
+extern err_t auth_receive_msg_by_sequence(unwrapped_message_t const **msg, author_t *author, address_t const *anchor_address, size_t *msg_num);
 // Fetching/Syncing
 extern err_t auth_fetch_next_msgs(unwrapped_messages_t const **umsgs, author_t *author);
 extern err_t auth_fetch_prev_msg(unwrapped_message_t const **umsg, author_t *author, address_t const *address);
@@ -187,6 +188,7 @@ extern err_t sub_receive_sequence(address_t const **address, subscriber_t *subsc
 extern err_t sub_gen_next_msg_ids(next_msg_ids_t const **ids, subscriber_t *subscriber);
 // Generic Message Processing
 extern err_t sub_receive_msg(unwrapped_message_t const *umsg, subscriber_t *subscriber, address_t const *address);
+extern err_t sub_receive_msg_by_sequence(unwrapped_message_t const **msg, subscriber_t *subscriber, address_t const *anchor_address, size_t *msg_num);
 // Fetching/Syncing
 extern err_t sub_fetch_next_msgs(unwrapped_messages_t const **messages, subscriber_t *subscriber);
 extern err_t sub_fetch_prev_msg(unwrapped_message_t const **umsg, subscriber_t *subscriber, address_t const *address);

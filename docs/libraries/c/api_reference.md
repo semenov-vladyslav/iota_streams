@@ -194,6 +194,17 @@ Receive a message generically without knowing its type.
 | link            | [`address_t const *`](#Address)                  | Address of sequence message         |
 **Returns:** Error code.
 
+#### auth_receive_msg_by_sequence(umsg, author, anchor_link, msg_num): [err_t](#Err)
+Receive a message by its msg number in an anchored single depth channel.
+
+| Param           | Type                                             | Description                          |
+| --------------- | ------------------------------------------------ | ------------------------------------ |
+| umsg            | [unwrapped_message_t const *](#UnwrappedMessage) | An Unwrapped Message wrapper around the retrieved message. |
+| author          | `author_t *`                                     | Author instance                      |
+| anchor_link     | [`address_t const *`](#Address)                  | Address of anchor message            |
+| msg_num         | `size_t`                                         | Message number                       |
+**Returns:** Error code.
+
 #### auth_sync_state(umsgs, author): [err_t](#Err)
 Synchronise a publishers state prior to sending another message. Retrieves any other messages from the channel 
 to ensure the user state matches all other publishers.
@@ -474,6 +485,17 @@ Receive a message generically without knowing its type.
 | umsg            | [unwrapped_message_t const *](#UnwrappedMessage) | An Unwrapped Message wrapper around the retrieved message. |
 | subscriber      | `subscriber_t *`                                 | Subscriber instance                  |
 | address         | [`address_t const *`](#Address)                  | Address of the message               |
+**Returns:** Error code.
+
+#### sub_receive_msg_by_sequence(umsg, subscriber, anchor_link, msg_num): [err_t](#Err)
+Receive a message by its msg number in an anchored single depth channel.
+
+| Param           | Type                                             | Description                          |
+| --------------- | ------------------------------------------------ | ------------------------------------ |
+| umsg            | [unwrapped_message_t const *](#UnwrappedMessage) | An Unwrapped Message wrapper around the retrieved message. |
+| subscriber      | `subscriber_t *`                                 | Subscriber instance                  |
+| anchor_link     | [`address_t const *`](#Address)                  | Address of anchor message            |
+| msg_num         | `size_t`                                         | Message number                       |
 **Returns:** Error code.
 
 #### sub_sync_state(umsgs, subscriber): [err_t](#Err)
