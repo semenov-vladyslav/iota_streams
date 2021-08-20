@@ -1,6 +1,5 @@
 use core::{
     cell::RefCell,
-    convert::TryFrom,
     str::FromStr,
 };
 use iota_streams::{
@@ -21,8 +20,10 @@ use iota_streams::{
     },
     app_channels::api::tangle::{
         Address as ApiAddress,
+        ChannelAddress as ApiChannelAddress,
         ChannelType as ApiChannelType,
         MessageContent,
+        MsgId as ApiMsgId,
         PublicKey,
         UnwrappedMessage,
     },
@@ -36,6 +37,7 @@ use iota_streams::{
             pskid_from_hex_str,
             pskid_to_hex_string,
         },
+        Error as ApiError,
     },
     ddml::types::hex,
 };
@@ -48,8 +50,29 @@ use iota_streams::{
 use js_sys::Array;
 
 pub type Result<T> = core::result::Result<T, JsValue>;
-pub fn to_result<T, E: ToString>(r: core::result::Result<T, E>) -> Result<T> {
-    r.map_err(|e| JsValue::from_str(&e.to_string()))
+
+/// [`Result`] trait-extension to add convenience methods for error handling
+pub(crate) trait ResultExt<T, E> {
+    /// Convert the potential error of the [`Result`] into a [`wasm_bindgen::JsValue`]
+    /// # Example
+    /// ```
+    /// # use wasm_bindgen::JsValue;
+    ///
+    /// #[wasm_bindgen(js_name = "parseInt")]
+    /// fn parse_int(string: &str) -> Result<u64, JsValue> {
+    ///     string.parse().into_js_err()
+    /// }
+    /// ```
+    fn into_js_result(self) -> core::result::Result<T, JsValue>;
+}
+
+impl<T, E> ResultExt<T, E> for core::result::Result<T, E>
+where
+    E: ToString,
+{
+    fn into_js_result(self) -> Result<T> {
+        self.map_err(|e| JsValue::from_str(&e.to_string()))
+    }
 }
 
 #[wasm_bindgen]
@@ -95,73 +118,153 @@ impl SendOptions {
 }
 
 #[wasm_bindgen]
-#[derive(Default, PartialEq)]
-pub struct Address {
-    addr_id: String,
-    msg_id: String,
-}
+#[derive(Clone, Copy)]
+pub struct Address(ApiAddress);
 
 #[wasm_bindgen]
 impl Address {
-    #[wasm_bindgen(getter)]
-    pub fn addr_id(&self) -> String {
-        self.addr_id.clone()
+    #[wasm_bindgen(constructor)]
+    pub fn new(channel_address: ChannelAddress, msgid: MsgId) -> Self {
+        Address(ApiAddress::new(channel_address.into_inner(), msgid.into_inner()))
     }
 
-    #[wasm_bindgen(setter)]
-    pub fn set_addr_id(&mut self, addr_id: String) {
-        self.addr_id = addr_id;
+    /// Generate the hash used to index the [`TangleMessage`] published in this address
+    ///
+    /// Currently this hash is computed with [Blake2b256]. The returned Uint8Array contains
+    /// the binary digest of the hash. To obtain the hexadecimal representation of the hash,
+    /// use the convenience method [`to_msg_index_hex()`].
+    #[wasm_bindgen(js_name = "toMsgIndex")]
+    pub fn to_msg_index(&self) -> Box<[u8]> {
+        self.0.to_msg_index().as_slice().into()
     }
 
-    #[wasm_bindgen(getter)]
-    pub fn msg_id(&self) -> String {
-        self.msg_id.clone()
+    /// Generate the hash used to index the [`TangleMessage`] published in this address
+    ///
+    /// Currently this hash is computed with [Blake2b256]. The returned String contains
+    /// the hexadecimal digest of the hash. To obtain the binary digest of the hash,
+    /// use the method [`to_msg_index()`].
+    #[wasm_bindgen(js_name = "toMsgIndexHex")]
+    pub fn to_msg_index_hex(&self) -> String {
+        format!("{:x}", self.0.to_msg_index())
     }
 
-    #[wasm_bindgen(setter)]
-    pub fn set_msg_id(&mut self, msg_id: String) {
-        self.msg_id = msg_id;
+    #[wasm_bindgen(getter, js_name = "channelAddress")]
+    pub fn channel_address(&self) -> ChannelAddress {
+        ChannelAddress(self.0.appinst)
     }
 
-    #[wasm_bindgen(static_method_of = Address)]
-    pub fn from_string(link: String) -> Self {
-        let link_vec: Vec<&str> = link
-            .strip_prefix("<")
-            .unwrap_or(&link)
-            .strip_suffix(">")
-            .unwrap_or(&link)
-            .split(':')
-            .collect();
-
-        Address {
-            addr_id: link_vec[0].to_string(),
-            msg_id: link_vec[1].to_string(),
-        }
+    #[wasm_bindgen(getter, js_name = "msgId")]
+    pub fn msg_id(&self) -> MsgId {
+        MsgId(self.0.msgid)
     }
 
-    #[wasm_bindgen]
+    #[allow(clippy::inherent_to_string)]
+    #[wasm_bindgen(js_name = "toString")]
     pub fn to_string(&self) -> String {
-        let mut link = String::new();
-        link.push_str(&self.addr_id);
-        link.push(':');
-        link.push_str(&self.msg_id);
-        link
+        self.0.to_string()
+    }
+
+    pub fn parse(string: &str) -> Result<Address> {
+        Ok(Self(string.parse().into_js_result()?))
     }
 
     pub fn copy(&self) -> Self {
-        Address {
-            addr_id: self.addr_id.clone(),
-            msg_id: self.msg_id.clone(),
-        }
+        *self
+    }
+}
+
+impl Address {
+    // non-JS methods
+
+    pub fn as_inner(&self) -> &ApiAddress {
+        &self.0
+    }
+}
+
+impl From<ApiAddress> for Address {
+    fn from(address: ApiAddress) -> Self {
+        Self(address)
+    }
+}
+
+impl AsRef<ApiAddress> for Address {
+    fn as_ref(&self) -> &ApiAddress {
+        self.as_inner()
+    }
+}
+
+impl FromStr for Address {
+    type Err = ApiError;
+    fn from_str(string: &str) -> core::result::Result<Self, Self::Err> {
+        Ok(Self(string.parse()?))
     }
 }
 
 pub type ClientWrap = Rc<RefCell<Client>>;
 
-impl TryFrom<Address> for ApiAddress {
-    type Error = JsValue;
-    fn try_from(addr: Address) -> Result<Self> {
-        ApiAddress::from_str(&addr.to_string()).map_err(|_err| JsValue::from_str("bad address"))
+#[wasm_bindgen]
+#[derive(Clone, Copy)]
+pub struct ChannelAddress(ApiChannelAddress);
+
+#[wasm_bindgen]
+impl ChannelAddress {
+    pub fn bytes(&self) -> Box<[u8]> {
+        self.0.as_bytes().into()
+    }
+
+    pub fn hex(&self) -> String {
+        self.0.to_hex_string()
+    }
+
+    #[allow(clippy::inherent_to_string)]
+    #[wasm_bindgen(js_name = "toString")]
+    pub fn to_string(&self) -> String {
+        self.0.to_string()
+    }
+
+    pub fn parse(string: &str) -> Result<ChannelAddress> {
+        Ok(Self(string.parse::<ApiChannelAddress>().into_js_result()?))
+    }
+
+    pub fn copy(&self) -> Self {
+        *self
+    }
+
+    fn into_inner(self) -> ApiChannelAddress {
+        self.0
+    }
+}
+
+#[wasm_bindgen]
+#[derive(Clone, Copy)]
+pub struct MsgId(ApiMsgId);
+
+#[wasm_bindgen]
+impl MsgId {
+    pub fn bytes(&self) -> Box<[u8]> {
+        self.0.as_bytes().into()
+    }
+
+    pub fn hex(&self) -> String {
+        self.0.to_hex_string()
+    }
+
+    #[allow(clippy::inherent_to_string)]
+    #[wasm_bindgen(js_name = "toString")]
+    pub fn to_string(&self) -> String {
+        self.0.to_string()
+    }
+
+    pub fn parse(string: &str) -> Result<MsgId> {
+        Ok(Self(string.parse().into_js_result()?))
+    }
+
+    pub fn copy(&self) -> Self {
+        *self
+    }
+
+    fn into_inner(self) -> ApiMsgId {
+        self.0
     }
 }
 
@@ -174,7 +277,7 @@ pub fn get_message_contents(msgs: Vec<UnwrappedMessage>) -> Vec<UserResponse> {
                 public_payload: p,
                 masked_payload: m,
             } => payloads.push(UserResponse::new(
-                Address::from_string(msg.link.to_string()),
+                msg.link.into(),
                 None,
                 Some(Message::new(Some(hex::encode(pk.to_bytes())), p.0, m.0)),
             )),
@@ -182,16 +285,12 @@ pub fn get_message_contents(msgs: Vec<UnwrappedMessage>) -> Vec<UserResponse> {
                 public_payload: p,
                 masked_payload: m,
             } => payloads.push(UserResponse::new(
-                Address::from_string(msg.link.to_string()),
+                msg.link.into(),
                 None,
                 Some(Message::new(None, p.0, m.0)),
             )),
             MessageContent::Sequence => (),
-            _ => payloads.push(UserResponse::new(
-                Address::from_string(msg.link.to_string()),
-                None,
-                None,
-            )),
+            _ => payloads.push(UserResponse::new(msg.link.into(), None, None)),
         };
     }
     payloads
@@ -215,6 +314,7 @@ impl From<ChannelType> for ApiChannelType {
 }
 
 #[wasm_bindgen]
+#[derive(Clone)]
 pub struct UserResponse {
     link: Address,
     seq_link: Option<Address>,
@@ -243,7 +343,7 @@ pub struct Cursor {
 impl From<ApiCursor<ApiAddress>> for Cursor {
     fn from(cursor: ApiCursor<ApiAddress>) -> Self {
         Cursor {
-            link: Address::from_string(cursor.link.to_string()),
+            link: cursor.link.into(),
             seq_no: cursor.seq_no,
             branch_no: cursor.branch_no,
         }
@@ -256,24 +356,29 @@ impl UserState {
         UserState { identifier, cursor }
     }
 
-    pub fn get_identifier(&self) -> String {
+    #[wasm_bindgen(getter)]
+    pub fn identifier(&self) -> String {
         self.identifier.clone()
     }
 
-    pub fn get_link(&self) -> Address {
-        self.cursor.link.copy()
+    #[wasm_bindgen(getter)]
+    pub fn link(&self) -> Address {
+        self.cursor.link
     }
 
-    pub fn get_seq_no(&self) -> u32 {
+    #[wasm_bindgen(getter, js_name = "seqNo")]
+    pub fn seq_no(&self) -> u32 {
         self.cursor.seq_no
     }
 
-    pub fn get_branch_no(&self) -> u32 {
+    #[wasm_bindgen(getter, js_name = "branchNo")]
+    pub fn branch_no(&self) -> u32 {
         self.cursor.branch_no
     }
 }
 
 #[wasm_bindgen]
+#[derive(Clone)]
 pub struct Message {
     identifier: Option<String>,
     public_payload: Vec<u8>,
@@ -293,7 +398,7 @@ impl PskIds {
     }
 
     pub fn add(&mut self, id: String) -> Result<()> {
-        let pskid = to_result(pskid_from_hex_str(&id))?;
+        let pskid = pskid_from_hex_str(&id).into_js_result()?;
         self.ids.push(pskid);
         Ok(())
     }
@@ -320,8 +425,8 @@ pub(crate) fn public_key_to_string(pk: &PublicKey) -> String {
 }
 
 pub(crate) fn public_key_from_string(hex_str: &str) -> Result<PublicKey> {
-    let bytes = to_result(hex::decode(hex_str))?;
-    to_result(PublicKey::from_bytes(&bytes))
+    let bytes = hex::decode(hex_str).into_js_result()?;
+    PublicKey::from_bytes(&bytes).into_js_result()
 }
 
 #[wasm_bindgen]
@@ -376,12 +481,14 @@ impl NextMsgId {
         NextMsgId { identifier, msgid }
     }
 
-    pub fn get_identifier(&self) -> String {
+    #[wasm_bindgen(getter)]
+    pub fn identifier(&self) -> String {
         self.identifier.clone()
     }
 
-    pub fn get_link(&self) -> Address {
-        self.msgid.copy()
+    #[wasm_bindgen(getter)]
+    pub fn link(&self) -> Address {
+        self.msgid
     }
 }
 
@@ -395,59 +502,37 @@ impl UserResponse {
         }
     }
 
-    pub fn from_strings(link: String, seq_link: Option<String>, message: Option<Message>) -> Self {
-        let seq;
-        if let Some(seq_link) = seq_link {
-            seq = Some(Address::from_string(seq_link));
+    pub fn from_strings(link: String, seq_link: Option<String>, message: Option<Message>) -> Result<UserResponse> {
+        let seq = if let Some(seq_link) = seq_link {
+            Some(Address::from_str(&seq_link).into_js_result()?)
         } else {
-            seq = None;
-        }
+            None
+        };
 
-        UserResponse {
-            link: Address::from_string(link),
+        Ok(UserResponse {
+            link: Address::from_str(&link).into_js_result()?,
             seq_link: seq,
             message,
-        }
+        })
     }
 
     pub fn copy(&self) -> Self {
-        let mut seq = None;
-        if !self.get_seq_link().eq(&Address::default()) {
-            seq = Some(self.get_seq_link());
-        }
-        UserResponse::new(self.get_link(), seq, None)
+        self.clone()
     }
 
-    pub fn get_link(&self) -> Address {
-        let mut link = Address::default();
-        link.set_addr_id(self.link.addr_id());
-        link.set_msg_id(self.link.msg_id());
-        link
+    #[wasm_bindgen(getter)]
+    pub fn link(&self) -> Address {
+        self.link
     }
 
-    pub fn get_seq_link(&self) -> Address {
-        if self.seq_link.is_some() {
-            let seq_link = self.seq_link.as_ref().unwrap();
-            let mut link = Address::default();
-            link.set_addr_id(seq_link.addr_id());
-            link.set_msg_id(seq_link.msg_id());
-            link
-        } else {
-            Address::default()
-        }
+    #[wasm_bindgen(getter, js_name = "seqLink")]
+    pub fn seq_link(&self) -> Option<Address> {
+        self.seq_link
     }
 
-    pub fn get_message(&mut self) -> Message {
-        if self.message.is_some() {
-            let message = self.message.as_ref().unwrap();
-            Message {
-                identifier: message.identifier.clone(),
-                public_payload: message.public_payload.clone(),
-                masked_payload: message.masked_payload.clone(),
-            }
-        } else {
-            Message::default()
-        }
+    #[wasm_bindgen(getter)]
+    pub fn message(&mut self) -> Option<Message> {
+        self.message.clone()
     }
 }
 
