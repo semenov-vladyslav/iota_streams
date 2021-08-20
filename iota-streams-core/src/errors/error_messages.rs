@@ -82,6 +82,10 @@ pub enum Errors {
     //////////
     /// Malformed address string: missing colon (':') separator between appinst and msgid
     MalformedAddressString,
+    /// Invalid Channel Address
+    InvalidChannelAddress,
+    /// Invalid Msg id
+    InvalidMsgId,
 
     //////////
     // Iota Client

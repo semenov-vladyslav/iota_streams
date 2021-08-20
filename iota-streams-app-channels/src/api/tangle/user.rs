@@ -109,7 +109,7 @@ impl<Trans> User<Trans> {
     ///   * `link` - Address link to be stored in internal sequence state mapping
     pub fn store_state(&mut self, id: Identifier, link: &Address) -> Result<()> {
         // TODO: assert!(link.appinst == self.appinst.unwrap());
-        self.user.store_state(id, link.msgid.clone())
+        self.user.store_state(id, link.msgid)
     }
 
     /// Stores the provided link and sequence number to the internal sequencing state for all participants
@@ -121,7 +121,7 @@ impl<Trans> User<Trans> {
     ///   * `seq_num` - New sequence state to be stored in internal sequence state mapping
     pub fn store_state_for_all(&mut self, link: &Address, seq_num: u32) -> Result<()> {
         // TODO: assert!(link.appinst == self.appinst.unwrap());
-        self.user.store_state_for_all(link.msgid.clone(), seq_num)
+        self.user.store_state_for_all(link.msgid, seq_num)
     }
 
     /// Fetches the latest PublicKey -> Cursor state mapping from the implementation, allowing the
@@ -473,7 +473,7 @@ impl<Trans: Transport + Clone> User<Trans> {
             // Forget TangleMessage and timestamp
             let msg = msg0.binary;
             let preparsed = msg.parse_header()?;
-            let link = preparsed.header.link.clone();
+            let link = preparsed.header.link;
             let prev_link = TangleAddress::from_bytes(&preparsed.header.previous_msg_link.0);
             match preparsed.header.content_type {
                 message::SIGNED_PACKET => match self.user.handle_signed_packet(msg, MsgInfo::SignedPacket) {
@@ -814,7 +814,7 @@ impl<Trans: Transport + Clone> User<Trans> {
             // Forget TangleMessage and timestamp
             let msg = msg0.binary;
             let preparsed = msg.parse_header()?;
-            let link = preparsed.header.link.clone();
+            let link = preparsed.header.link;
             let prev_link = TangleAddress::from_bytes(&preparsed.header.previous_msg_link.0);
             match preparsed.header.content_type {
                 message::SIGNED_PACKET => match self.user.handle_signed_packet(msg, MsgInfo::SignedPacket) {
