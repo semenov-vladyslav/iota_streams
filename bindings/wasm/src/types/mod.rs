@@ -117,6 +117,14 @@ impl SendOptions {
     }
 }
 
+/// Tangle representation of a Message Link.
+///
+/// An `Address` is comprised of 2 distinct parts: the channel identifier
+/// ({@link ChannelAddress}) and the message identifier
+/// ({@link MsgId}). The channel identifier is unique per channel and is common in the
+/// `Address` of all messages published in it. The message identifier is
+/// produced pseudo-randomly out of the the message's sequence number, the
+/// previous message identifier, and other internal properties.
 #[wasm_bindgen]
 #[derive(Clone, Copy)]
 pub struct Address(ApiAddress);
@@ -126,26 +134,6 @@ impl Address {
     #[wasm_bindgen(constructor)]
     pub fn new(channel_address: ChannelAddress, msgid: MsgId) -> Self {
         Address(ApiAddress::new(channel_address.into_inner(), msgid.into_inner()))
-    }
-
-    /// Generate the hash used to index the [`TangleMessage`] published in this address
-    ///
-    /// Currently this hash is computed with [Blake2b256]. The returned Uint8Array contains
-    /// the binary digest of the hash. To obtain the hexadecimal representation of the hash,
-    /// use the convenience method [`to_msg_index_hex()`].
-    #[wasm_bindgen(js_name = "toMsgIndex")]
-    pub fn to_msg_index(&self) -> Box<[u8]> {
-        self.0.to_msg_index().as_slice().into()
-    }
-
-    /// Generate the hash used to index the [`TangleMessage`] published in this address
-    ///
-    /// Currently this hash is computed with [Blake2b256]. The returned String contains
-    /// the hexadecimal digest of the hash. To obtain the binary digest of the hash,
-    /// use the method [`to_msg_index()`].
-    #[wasm_bindgen(js_name = "toMsgIndexHex")]
-    pub fn to_msg_index_hex(&self) -> String {
-        format!("{:x}", self.0.to_msg_index())
     }
 
     #[wasm_bindgen(getter, js_name = "channelAddress")]
@@ -158,12 +146,44 @@ impl Address {
         MsgId(self.0.msgid)
     }
 
+    /// Generate the hash used to index the {@link Message} published in this address.
+    ///
+    /// Currently this hash is computed with {@link https://en.wikipedia.org/wiki/BLAKE_(hash_function)#BLAKE2|Blake2b256}.
+    /// The returned Uint8Array contains the binary digest of the hash. To obtain the hexadecimal representation of the hash,
+    /// use the convenience method {@link Address#toMsgIndexHex}.
+    #[wasm_bindgen(js_name = "toMsgIndex")]
+    pub fn to_msg_index(&self) -> Box<[u8]> {
+        self.0.to_msg_index().as_slice().into()
+    }
+
+    /// Generate the hash used to index the {@link Message} published in this address.
+    ///
+    /// Currently this hash is computed with {@link https://en.wikipedia.org/wiki/BLAKE_(hash_function)#BLAKE2|Blake2b256}.
+    /// The returned String contains the hexadecimal digest of the hash. To obtain the binary digest of the hash,
+    /// use the method {@link Address#toMsgIndex}.
+    #[wasm_bindgen(js_name = "toMsgIndexHex")]
+    pub fn to_msg_index_hex(&self) -> String {
+        format!("{:x}", self.0.to_msg_index())
+    }
+
+    /// Render the `Address` as a colon-separated String of the hex-encoded {@link Address#channelAddress} and
+    /// {@link Address#msgId} (`<channelAddressHex>:<msgIdHex>`) suitable for exchanging the `Address` between participants.
+    /// To convert the String back to an `Address`, use {@link Address.parse}.
+    ///
+    /// @see Address.parse
     #[allow(clippy::inherent_to_string)]
     #[wasm_bindgen(js_name = "toString")]
     pub fn to_string(&self) -> String {
         self.0.to_string()
     }
 
+    /// Decode an `Address` out of a String. The String must follow the format used by {@link Address#toString}
+    ///
+    /// @throws Throws an error if String does not follow the format `<channelAddressHex>:<msgIdHex>`
+    ///
+    /// @see Address#toString
+    /// @see ChannelAddress#hex
+    /// @see MsgId#hex
     pub fn parse(string: &str) -> Result<Address> {
         Ok(Self(string.parse().into_js_result()?))
     }
@@ -202,28 +222,44 @@ impl FromStr for Address {
 
 pub type ClientWrap = Rc<RefCell<Client>>;
 
+/// Channel application instance identifier (40 Byte)
 #[wasm_bindgen]
 #[derive(Clone, Copy)]
 pub struct ChannelAddress(ApiChannelAddress);
 
 #[wasm_bindgen]
 impl ChannelAddress {
+    /// Render the `ChannelAddress` as a 40 Byte {@link https://developer.mozilla.org/es/docs/Web/JavaScript/Reference/Global_Objects/Uint8Array|Uint8Array}
+    ///
+    /// @see ChannelAddress#hex
     pub fn bytes(&self) -> Box<[u8]> {
         self.0.as_bytes().into()
     }
 
+    /// Render the `ChannelAddress` as a 40 Byte (80 char) hexadecimal String
+    ///
+    /// @see ChannelAddress#bytes
     pub fn hex(&self) -> String {
         self.0.to_hex_string()
     }
 
+    /// Render the `ChannelAddress` as an exchangeable String. Currently
+    /// outputs the same as {@link ChannelAddress#hex}.
+    ///
+    /// @see ChannelAddress#hex
+    /// @see ChannelAddress.parse
     #[allow(clippy::inherent_to_string)]
     #[wasm_bindgen(js_name = "toString")]
     pub fn to_string(&self) -> String {
         self.0.to_string()
     }
 
+    /// Decode a `ChannelAddress` out of a String. The string must be a 80 char long hexadecimal string.
+    ///
+    /// @see ChannelAddress#toString
+    /// @throws Throws error if string does not follow the expected format
     pub fn parse(string: &str) -> Result<ChannelAddress> {
-        Ok(Self(string.parse::<ApiChannelAddress>().into_js_result()?))
+        Ok(Self(string.parse().into_js_result()?))
     }
 
     pub fn copy(&self) -> Self {
@@ -235,26 +271,42 @@ impl ChannelAddress {
     }
 }
 
+/// Message identifier (12 Byte). Unique within a Channel.
 #[wasm_bindgen]
 #[derive(Clone, Copy)]
 pub struct MsgId(ApiMsgId);
 
 #[wasm_bindgen]
 impl MsgId {
+    /// Render the `MsgId` as a 12 Byte {@link https://developer.mozilla.org/es/docs/Web/JavaScript/Reference/Global_Objects/Uint8Array|Uint8Array}
+    ///
+    /// @see MsgId#hex
     pub fn bytes(&self) -> Box<[u8]> {
         self.0.as_bytes().into()
     }
 
+    /// Render the `MsgId` as a 12 Byte (24 char) hexadecimal String
+    ///
+    /// @see MsgId#bytes
     pub fn hex(&self) -> String {
         self.0.to_hex_string()
     }
 
+    /// Render the `MsgId` as an exchangeable String. Currently
+    /// outputs the same as {@link MsgId#hex}.
+    ///
+    /// @see MsgId#hex
+    /// @see MsgId.parse
     #[allow(clippy::inherent_to_string)]
     #[wasm_bindgen(js_name = "toString")]
     pub fn to_string(&self) -> String {
         self.0.to_string()
     }
 
+    /// Decode a `MsgId` out of a String. The string must be a 24 char long hexadecimal string.
+    ///
+    /// @see Msgid#toString
+    /// @throws Throws error if string does not follow the expected format
     pub fn parse(string: &str) -> Result<MsgId> {
         Ok(Self(string.parse().into_js_result()?))
     }
