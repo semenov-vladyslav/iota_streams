@@ -45,8 +45,8 @@ impl Client {
                 .get_link_details(link.as_inner())
                 .await
                 .map(Details::from)
-                .map(Into::into) // Details => JsValue
-                .into_js_result() // Error => JsValue
+                .map(JsValue::from)
+                .into_js_result()
         })
     }
 }
