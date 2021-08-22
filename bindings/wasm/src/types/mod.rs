@@ -149,8 +149,8 @@ impl Address {
     /// Generate the hash used to index the {@link Message} published in this address.
     ///
     /// Currently this hash is computed with {@link https://en.wikipedia.org/wiki/BLAKE_(hash_function)#BLAKE2|Blake2b256}.
-    /// The returned Uint8Array contains the binary digest of the hash. To obtain the hexadecimal representation of the hash,
-    /// use the convenience method {@link Address#toMsgIndexHex}.
+    /// The returned Uint8Array contains the binary digest of the hash. To obtain the hexadecimal representation of the
+    /// hash, use the convenience method {@link Address#toMsgIndexHex}.
     #[wasm_bindgen(js_name = "toMsgIndex")]
     pub fn to_msg_index(&self) -> Box<[u8]> {
         self.0.to_msg_index().as_slice().into()
@@ -167,8 +167,8 @@ impl Address {
     }
 
     /// Render the `Address` as a colon-separated String of the hex-encoded {@link Address#channelAddress} and
-    /// {@link Address#msgId} (`<channelAddressHex>:<msgIdHex>`) suitable for exchanging the `Address` between participants.
-    /// To convert the String back to an `Address`, use {@link Address.parse}.
+    /// {@link Address#msgId} (`<channelAddressHex>:<msgIdHex>`) suitable for exchanging the `Address` between
+    /// participants. To convert the String back to an `Address`, use {@link Address.parse}.
     ///
     /// @see Address.parse
     #[allow(clippy::inherent_to_string)]
@@ -554,16 +554,15 @@ impl UserResponse {
         }
     }
 
+    #[wasm_bindgen(js_name = "fromStrings")]
     pub fn from_strings(link: String, seq_link: Option<String>, message: Option<Message>) -> Result<UserResponse> {
-        let seq = if let Some(seq_link) = seq_link {
-            Some(Address::from_str(&seq_link).into_js_result()?)
-        } else {
-            None
-        };
-
         Ok(UserResponse {
             link: Address::from_str(&link).into_js_result()?,
-            seq_link: seq,
+            seq_link: seq_link
+                .as_deref()
+                .map(Address::from_str)
+                .transpose()
+                .into_js_result()?,
             message,
         })
     }
