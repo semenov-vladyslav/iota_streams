@@ -230,7 +230,7 @@ impl TangleAddress {
 
     /// Generate the hash used to index the [`TangleMessage`] published in this address
     ///
-    /// Currently this hash is computed with [`to_blake2b`].
+    /// Currently this hash is computed with [`Self::to_blake2b`].
     pub fn to_msg_index(&self) -> NBytes<U32> {
         self.to_blake2b()
     }
