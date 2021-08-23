@@ -220,7 +220,7 @@ impl TangleAddress {
     }
 
     /// Hash the content of the TangleAddress using `Blake2b256`
-    pub fn to_blake2b(&self) -> NBytes<U32> {
+    fn to_blake2b(&self) -> NBytes<U32> {
         let hasher = blake2b::Blake2b256::new();
         let hash = hasher.chain(&self.appinst).chain(&self.msgid).finalize();
         hash.into()
@@ -228,7 +228,9 @@ impl TangleAddress {
 
     /// Generate the hash used to index the [`TangleMessage`] published in this address
     ///
-    /// Currently this hash is computed with [`to_blake2b`].
+    /// Currently this hash is computed with [Blake2b256].
+    ///
+    /// [Blake2b256]: https://en.wikipedia.org/wiki/BLAKE_(hash_function)#BLAKE2|Blake2b256
     pub fn to_msg_index(&self) -> NBytes<U32> {
         self.to_blake2b()
     }
