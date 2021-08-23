@@ -27,16 +27,16 @@ async function main() {
   console.log("multi branching: ", auth.is_multi_branching());
 
   let response = await auth.clone().send_announce();
-  let ann_link = response.get_link();
-  console.log("announced at: ", ann_link.to_string());
+  let ann_link = response.link;
+  console.log("announced at: ", ann_link.toString());
+  console.log("Announce message index: " + ann_link.toMsgIndexHex());
 
-  let details = await auth.clone().get_client().get_link_details(ann_link.copy());
-  console.log("Announce message id: " + details.get_metadata().message_id)
+  let details = await auth.clone().get_client().get_link_details(ann_link);
+  console.log("Announce message id: " + details.get_metadata().message_id);
 
   let seed2 = make_seed(81);
   let sub = new streams.Subscriber(seed2, options.clone());
-  let ann_link_copy = ann_link.copy();
-  await sub.clone().receive_announcement(ann_link_copy);
+  await sub.clone().receive_announcement(ann_link.copy());
   let author_pk = sub.author_public_key();
   console.log("Channel registered by subscriber, author's public key: ", author_pk);
 
@@ -44,17 +44,18 @@ async function main() {
   let start_state = sub.fetch_state();
 
   console.log("Subscribing...");
-  ann_link_copy = ann_link.copy();
-  response = await sub.clone().send_subscribe(ann_link_copy);
-  let sub_link = response.get_link();
-  console.log("Subscription message at: ", sub_link.to_string());
+  response = await sub.clone().send_subscribe(ann_link.copy());
+  let sub_link = response.link;
+  console.log("Subscription message at: ", sub_link.toString());
+  console.log("Subscription message index: " + sub_link.toMsgIndexHex());
   await auth.clone().receive_subscribe(sub_link);
   console.log("Subscription processed");
 
   console.log("Sending Keyload");
-  response = await auth.clone().send_keyload_for_everyone(ann_link);
-  let keyload_link = response.get_link();
-  console.log("Keyload message at: ", keyload_link.to_string());
+  response = await auth.clone().send_keyload_for_everyone(ann_link.copy());
+  let keyload_link = response.link;
+  console.log("Keyload message at: ", keyload_link.toString());
+  console.log("Keyload message index: " + keyload_link.toMsgIndexHex());
 
   console.log("Subscriber syncing...");
   await sub.clone().sync_state();
@@ -66,8 +67,9 @@ async function main() {
   response = await sub
     .clone()
     .send_tagged_packet(keyload_link, public_payload, masked_payload);
-  let tag_link = response.get_link();
-  console.log("Tag packet at: ", tag_link.to_string());
+  let tag_link = response.link;
+  console.log("Tag packet at: ", tag_link.toString());
+  console.log("Tag packet index: " + tag_link.toMsgIndexHex());
 
   let last_link = tag_link;
   console.log("Subscriber Sending multiple signed packets");
@@ -76,8 +78,9 @@ async function main() {
     response = await sub
       .clone()
       .send_signed_packet(last_link, public_payload, masked_payload);
-    last_link = response.get_link();
-    console.log("Signed packet at: ", last_link.to_string());
+    last_link = response.link;
+    console.log("Signed packet at: ", last_link.toString());
+    console.log("Signed packet index: " + last_link.toMsgIndexHex());
   }
 
   console.log("\nAuthor fetching next messages");
@@ -93,9 +96,9 @@ async function main() {
       console.log("Found a message...");
       console.log(
         "Public: ",
-        from_bytes(next_msgs[i].get_message().get_public_payload()),
+        from_bytes(next_msgs[i].message.get_public_payload()),
         "\tMasked: ",
-        from_bytes(next_msgs[i].get_message().get_masked_payload())
+        from_bytes(next_msgs[i].message.get_masked_payload())
       );
     }
   }
@@ -106,9 +109,9 @@ async function main() {
 
   var matches = true;
   for (var i = 0; i < reset_state.length; i++) {
-    if (start_state[i].get_link().to_string() != reset_state[i].get_link().to_string() ||
-        start_state[i].get_seq_no() != reset_state[i].get_seq_no() ||
-        start_state[i].get_branch_no() != reset_state[i].get_branch_no()) {
+    if (start_state[i].link.toString() != reset_state[i].link.toString() ||
+        start_state[i].seqNo != reset_state[i].seqNo ||
+        start_state[i].branchNo != reset_state[i].branchNo) {
       matches = false;
     }
   }
@@ -118,7 +121,8 @@ async function main() {
   console.log("\nAuthor fetching prev messages");
   let prev_msgs = await auth.clone().fetch_prev_msgs(last_link, 3);
   for (var j = 0; j < prev_msgs.length; j++) {
-    console.log("Found a message at ", prev_msgs[j].get_link().to_string());
+    console.log("Found a message at ", prev_msgs[j].link.toString());
+    console.log("Found a message at index: " + prev_msgs[j].link.toMsgIndexHex());
   }
 
   // Import export example

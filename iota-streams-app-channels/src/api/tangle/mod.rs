@@ -1,6 +1,7 @@
 //! Default parameters for Author and Subscriber types.
 
 use super::key_store::KeyMap;
+pub use iota_streams_app::transport::tangle::MsgId;
 use iota_streams_app::{
     message::{
         self,
@@ -11,7 +12,6 @@ use iota_streams_app::{
         tangle::{
             AppInst,
             DefaultTangleLinkGenerator,
-            MsgId,
             TangleAddress,
             TangleMessage,
         },

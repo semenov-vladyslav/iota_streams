@@ -25,3 +25,10 @@ npm run build:nodejs
 ```bash
 npm run example:nodejs
 ```
+
+## Generate docs
+```bash
+npm run doc:nodejs
+```
+
+The generated docs are available in `node/jsdocs/index.html`
