@@ -29,9 +29,10 @@ async function main() {
   let response = await auth.clone().send_announce();
   let ann_link = response.link;
   console.log("announced at: ", ann_link.toString());
+  console.log("Announce message index: " + ann_link.toMsgIndexHex());
 
   let details = await auth.clone().get_client().get_link_details(ann_link);
-  console.log("Announce message id: " + details.get_metadata().message_id)
+  console.log("Announce message id: " + details.get_metadata().message_id);
 
   let seed2 = make_seed(81);
   let sub = new streams.Subscriber(seed2, options.clone());
@@ -46,6 +47,7 @@ async function main() {
   response = await sub.clone().send_subscribe(ann_link.copy());
   let sub_link = response.link;
   console.log("Subscription message at: ", sub_link.toString());
+  console.log("Subscription message index: " + sub_link.toMsgIndexHex());
   await auth.clone().receive_subscribe(sub_link);
   console.log("Subscription processed");
 
@@ -53,6 +55,7 @@ async function main() {
   response = await auth.clone().send_keyload_for_everyone(ann_link.copy());
   let keyload_link = response.link;
   console.log("Keyload message at: ", keyload_link.toString());
+  console.log("Keyload message index: " + keyload_link.toMsgIndexHex());
 
   console.log("Subscriber syncing...");
   await sub.clone().sync_state();
@@ -66,6 +69,7 @@ async function main() {
     .send_tagged_packet(keyload_link, public_payload, masked_payload);
   let tag_link = response.link;
   console.log("Tag packet at: ", tag_link.toString());
+  console.log("Tag packet index: " + tag_link.toMsgIndexHex());
 
   let last_link = tag_link;
   console.log("Subscriber Sending multiple signed packets");
@@ -76,6 +80,7 @@ async function main() {
       .send_signed_packet(last_link, public_payload, masked_payload);
     last_link = response.link;
     console.log("Signed packet at: ", last_link.toString());
+    console.log("Signed packet index: " + last_link.toMsgIndexHex());
   }
 
   console.log("\nAuthor fetching next messages");
@@ -117,6 +122,7 @@ async function main() {
   let prev_msgs = await auth.clone().fetch_prev_msgs(last_link, 3);
   for (var j = 0; j < prev_msgs.length; j++) {
     console.log("Found a message at ", prev_msgs[j].link.toString());
+    console.log("Found a message at index: " + prev_msgs[j].link.toMsgIndexHex());
   }
 
   // Import export example
