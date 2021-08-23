@@ -122,7 +122,6 @@ where
                                 .commit()?
                                 .mask(&self.key),
                             Identifier::EdPubKey(_pk) => ctx.x25519(
-                                // TODO: refactor
                                 &x25519::PublicKey::from(<[u8; 32]>::try_from(store_id.as_ref())?),
                                 &self.key,
                             ),
