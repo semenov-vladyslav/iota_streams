@@ -4,6 +4,7 @@ use core::{
         AsRef,
     },
     fmt,
+    ops::Add,
 };
 
 // Reexport some often used types
@@ -21,7 +22,9 @@ pub use iota_streams_core::prelude::{
     },
 };
 
-/// Fixed-size array of bytes, the size is known at compile time and is not encoded in trinary representation.
+/// Fixed-size array of bytes
+///
+/// The size of the array is known at compile time.
 #[derive(Clone, PartialEq, Eq, Debug, Default, Hash)]
 pub struct NBytes<N: ArrayLength<u8>>(pub GenericArray<u8, N>);
 
@@ -92,5 +95,25 @@ impl<'a, N: ArrayLength<u8>> From<&'a [u8]> for &'a NBytes<N> {
 impl<'a, N: ArrayLength<u8>> From<&'a mut [u8]> for &'a mut NBytes<N> {
     fn from(slice: &mut [u8]) -> &mut NBytes<N> {
         unsafe { &mut *(slice.as_mut_ptr() as *mut NBytes<N>) }
+    }
+}
+
+impl<N> fmt::LowerHex for NBytes<N>
+where
+    N: ArrayLength<u8> + Add,
+    <N as Add>::Output: ArrayLength<u8>,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::LowerHex::fmt(&self.0, f)
+    }
+}
+
+impl<N> fmt::UpperHex for NBytes<N>
+where
+    N: ArrayLength<u8> + Add,
+    <N as Add>::Output: ArrayLength<u8>,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::UpperHex::fmt(&self.0, f)
     }
 }

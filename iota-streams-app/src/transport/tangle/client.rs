@@ -72,8 +72,6 @@ fn handle_client_result<T>(result: iota_client::Result<T>) -> Result<T> {
     result.map_err(|err| wrapped_err!(ClientOperationFailure, WrappedError(err)))
 }
 
-use super::get_hash;
-
 /// Reconstruct Streams Message from bundle.
 ///
 /// The input bundle is not checked (for validity of the hash, consistency of indices, etc.).
@@ -95,9 +93,9 @@ pub fn msg_from_tangle_message<F>(message: &Message, link: &TangleAddress) -> Re
     }
 }
 
-async fn get_messages(client: &iota_client::Client, tx_address: &[u8], tx_tag: &[u8]) -> Result<Vec<Message>> {
-    let hash = get_hash(tx_address, tx_tag)?;
-    let msg_ids = handle_client_result(client.get_message().index(&hash.to_string()).await)?;
+async fn get_messages(client: &iota_client::Client, link: &TangleAddress) -> Result<Vec<Message>> {
+    let hash = link.to_msg_index();
+    let msg_ids = handle_client_result(client.get_message().index(hash).await)?;
     try_or!(!msg_ids.is_empty(), IndexNotFound)?;
 
     let msgs = join_all(
@@ -115,19 +113,13 @@ async fn get_messages(client: &iota_client::Client, tx_address: &[u8], tx_tag: &
 
 /// Send a message to the Tangle using a node client
 pub async fn async_send_message_with_options<F>(client: &iota_client::Client, msg: &TangleMessage<F>) -> Result<()> {
-    let hash = get_hash(msg.binary.link.appinst.as_ref(), msg.binary.link.msgid.as_ref())?;
-    let binary = &msg.binary;
-
-    let mut bytes = Vec::<u8>::new();
-    for b in &binary.body.bytes {
-        bytes.push(*b);
-    }
+    let hash = msg.binary.link.to_msg_index();
 
     // TODO: Get rid of copy caused by to_owned
     client
         .message()
-        .with_index(&hash.to_string())
-        .with_data(bytes)
+        .with_index(hash)
+        .with_data(msg.binary.body.bytes.clone())
         .finish()
         .await?;
     Ok(())
@@ -138,9 +130,7 @@ pub async fn async_recv_messages<F>(
     client: &iota_client::Client,
     link: &TangleAddress,
 ) -> Result<Vec<TangleMessage<F>>> {
-    let tx_address = link.appinst.as_ref();
-    let tx_tag = link.msgid.as_ref();
-    match get_messages(client, tx_address, tx_tag).await {
+    match get_messages(client, link).await {
         Ok(txs) => Ok(txs
             .iter()
             .filter_map(|b| msg_from_tangle_message(b, link).ok()) // Ignore errors
@@ -151,12 +141,8 @@ pub async fn async_recv_messages<F>(
 
 /// Retrieve details of a link from the tangle using a node client
 pub async fn async_get_link_details(client: &iota_client::Client, link: &TangleAddress) -> Result<Details> {
-    let tx_address = link.appinst.as_ref();
-    let tx_tag = link.msgid.as_ref();
-
-    let hash = get_hash(tx_address, tx_tag)?;
-
-    let msg_ids = handle_client_result(client.get_message().index(&hash.to_string()).await)?;
+    let hash = link.to_msg_index();
+    let msg_ids = handle_client_result(client.get_message().index(hash).await)?;
     try_or!(!msg_ids.is_empty(), IndexNotFound)?;
 
     let metadata = handle_client_result(client.get_message().metadata(&msg_ids[0]).await)?;

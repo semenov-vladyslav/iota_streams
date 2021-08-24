@@ -90,9 +90,9 @@ pub trait Join<L, S> {
 
 /// Repeated modifier.
 pub trait Repeated<I, F> {
-    /// `values_iter` provides some iterated values or counter.
+    /// `values` provides an iterable over values or counter.
     /// `value_handler` handles one item.
-    fn repeated(&mut self, values_iter: I, value_handle: F) -> Result<&mut Self>;
+    fn repeated(&mut self, values: I, value_handle: F) -> Result<&mut Self>;
 }
 
 /// Condition guard.

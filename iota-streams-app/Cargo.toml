@@ -41,7 +41,7 @@ async-trait = { version = "0.1", optional = true }
 atomic_refcell = { version = "0.1.6", optional = true }
 
 # Dependencies for "client" feature
-iota-client = { git = "https://github.com/iotaledger/iota.rs", branch = "dev", default-features = false, optional = true }
+iota-client = { git = "https://github.com/iotaledger/iota.rs", rev  = "283af58b6f9a20b3698e5128e3e651b2a4dce861", default-features = false, optional = true }
 
 num_cpus = { version = "1.10", optional = true }
 

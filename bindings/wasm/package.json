@@ -17,7 +17,7 @@
     "prepublishOnly": "npm run build",
     "test": "mocha",
     "serve": "webpack-dev-server",
-    "example:node": "node examples/node.js"
+    "example:nodejs": "node examples/node.js"
   },
   "contributors": [
     "huhn511 <huhn.dev@gmail.com>"

@@ -162,15 +162,16 @@ impl Author {
 
     #[wasm_bindgen(catch)]
     pub async fn send_keyload(self, link: Address, psk_ids: PskIdsW, sig_pks: PublicKeysW) -> Result<UserResponse> {
-        let pks: Vec<Identifier> = sig_pks.pks.iter().map(|pk| (*pk).into()).collect();
+        let pks = sig_pks.pks.into_iter().map(Into::<Identifier>::into);
+        let psks = psk_ids.ids.into_iter().map(Into::<Identifier>::into);
+        let identifiers: Vec<Identifier> = pks.chain(psks).collect();
         self.author
             .borrow_mut()
             .send_keyload(
                 &link
                     .try_into()
                     .map_or_else(|_err| ApiAddress::default(), |addr: ApiAddress| addr),
-                &psk_ids.ids,
-                &pks.iter().collect(),
+                &identifiers,
             )
             .await
             .map_or_else(

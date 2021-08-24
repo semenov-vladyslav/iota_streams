@@ -1,4 +1,4 @@
-const streams = require("../node/streams_wasm");
+const streams = require("../node/iota_streams_wasm");
 const fetch = require("node-fetch");
 
 global.fetch = fetch;

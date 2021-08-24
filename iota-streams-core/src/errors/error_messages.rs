@@ -78,6 +78,12 @@ pub enum Errors {
     TransportNotAvailable,
 
     //////////
+    // Iota Transport
+    //////////
+    /// Malformed address string: missing colon (':') separator between appinst and msgid
+    MalformedAddressString,
+
+    //////////
     // Iota Client
     //////////
     /// Iota Message Address failed to generate. // UNUSED

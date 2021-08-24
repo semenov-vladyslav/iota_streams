@@ -29,3 +29,12 @@ pub mod message;
 
 /// Author and Subscriber API.
 pub mod api;
+
+/// Get a `Value` given a `Key`
+///
+/// This trait can be implemented to any kind of collection to get an item out of it.
+/// It's meant to be versatile, so it can be implemented for T or &T, and both `Key` and
+/// `Value` can be owned or references as well.
+pub trait Lookup<Key, Value> {
+    fn lookup(&self, key: Key) -> Option<Value>;
+}

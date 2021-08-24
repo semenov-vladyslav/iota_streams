@@ -3,7 +3,7 @@
 [package]
 name = "iota-streams"
 version = "1.0.0"
-authors = ["Vlad Semenov <vlad.semenov@iota.org>", "Dyrell Chapman <dyrell.chapman@iota.org>", "Brord van Wierst <brord@iota.org>"]
+authors = ["Vlad Semenov <vlad.semenov@iota.org>", "Dyrell Chapman <dyrell.chapman@iota.org>", "Brord van Wierst <brord@iota.org>", "Arnau Orriols <arnau.orriols@iota.org"]
 edition = "2018"
 license = "Apache-2.0/MIT"
 readme = "README.md"

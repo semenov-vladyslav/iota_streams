@@ -171,8 +171,10 @@ pub unsafe extern "C" fn auth_send_keyload(
             link_to.as_ref().map_or(Err::NullArgument, |link_to| {
                 psk_ids.as_ref().map_or(Err::NullArgument, |psk_ids| {
                     ke_pks.as_ref().map_or(Err::NullArgument, |ke_pks| {
-                        let identifiers: Vec<Identifier> = ke_pks.into_iter().map(|pk| (*pk).into()).collect();
-                        user.send_keyload(link_to, psk_ids, &identifiers.iter().collect())
+                        let pks = ke_pks.into_iter().copied().map(Into::<Identifier>::into);
+                        let psks = psk_ids.into_iter().copied().map(Into::<Identifier>::into);
+                        let identifiers: Vec<Identifier> = pks.chain(psks).collect();
+                        user.send_keyload(link_to, &identifiers)
                             .map_or(Err::OperationFailed, |response| {
                                 *r = response.into();
                                 Err::Ok

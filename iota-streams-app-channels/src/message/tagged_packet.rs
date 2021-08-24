@@ -106,15 +106,13 @@ pub struct ContentUnwrap<F, Link: HasLink> {
     pub(crate) _phantom: core::marker::PhantomData<(F, Link)>,
 }
 
-impl<F, Link> ContentUnwrap<F, Link>
+impl<F, Link> Default for ContentUnwrap<F, Link>
 where
     Link: HasLink,
-    <Link as HasLink>::Rel: Eq + Default + SkipFallback<F>,
 {
-    #[allow(clippy::new_without_default)]
-    pub fn new() -> Self {
+    fn default() -> Self {
         Self {
-            link: <<Link as HasLink>::Rel as Default>::default(),
+            link: Link::Rel::default(),
             public_payload: Bytes::default(),
             masked_payload: Bytes::default(),
             _phantom: core::marker::PhantomData,

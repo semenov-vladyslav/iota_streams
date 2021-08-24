@@ -15,7 +15,9 @@ use iota_streams_core::{
 use iota_streams_core_edsig::key_exchange::x25519;
 
 pub trait KeyStore<Info, F: PRP>: Default {
-    fn filter(&self, pks: &[&Identifier]) -> Vec<(&Identifier, Vec<u8>)>;
+    fn filter<'a, I>(&self, ids: I) -> Vec<(&Identifier, Vec<u8>)>
+    where
+        I: IntoIterator<Item = &'a Identifier>;
 
     /// Retrieve the sequence state for a given publisher
     fn get(&self, id: &Identifier) -> Option<&Info>;
@@ -54,8 +56,11 @@ impl<Info> Default for KeyMap<Info> {
 }
 
 impl<Info, F: PRP> KeyStore<Info, F> for KeyMap<Info> {
-    fn filter(&self, ids: &[&Identifier]) -> Vec<(&Identifier, Vec<u8>)> {
-        ids.iter()
+    fn filter<'a, I>(&self, ids: I) -> Vec<(&Identifier, Vec<u8>)>
+    where
+        I: IntoIterator<Item = &'a Identifier>,
+    {
+        ids.into_iter()
             .filter_map(|id| match &id {
                 Identifier::EdPubKey(_id) => self
                     .ke_pks
@@ -64,8 +69,8 @@ impl<Info, F: PRP> KeyStore<Info, F> for KeyMap<Info> {
                 Identifier::PskId(_id) => self
                     .psks
                     .get_key_value(id)
-                    .filter(|(_, (x, _))| x.is_some())
-                    .map(|(e, (x, _))| (e, x.unwrap().to_vec())),
+                    .map(|(e, (x, _))| x.map(|xx| (e, xx.to_vec())))
+                    .flatten(),
             })
             .collect()
     }

@@ -5,7 +5,6 @@ pub mod key_store;
 /// type_complexity to be determined in future issue
 
 /// Base level api for user implementation
-#[allow(clippy::ptr_arg, clippy::type_complexity)]
 pub mod user;
 
 /// Tangle-specific Channel API.

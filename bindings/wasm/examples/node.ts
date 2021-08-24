@@ -1,4 +1,4 @@
-import * as streams from '../node/streams_wasm';
+import * as streams from '../node/iota_streams_wasm';
 
 import * as fetch from 'node-fetch';
 

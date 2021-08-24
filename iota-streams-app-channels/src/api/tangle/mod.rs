@@ -57,8 +57,6 @@ pub type WrappedMessage = message::WrappedMessage<DefaultF, Address>;
 pub type WrapState = message::WrapState<DefaultF, Address>;
 /// Wrapper for optional sequence message and state
 pub type WrappedSequence = super::user::WrappedSequence<DefaultF, Address>;
-/// Wrapped sequencing information with optional WrapState
-pub type WrapStateSequence = super::user::WrapStateSequence<DefaultF, Address>;
 /// Ed25519 Public Key
 pub type PublicKey = ed25519::PublicKey;
 
@@ -87,8 +85,13 @@ impl<T> Transport for T where T: transport::Transport<Address, Message> + Clone 
 mod msginfo;
 pub use msginfo::MsgInfo;
 
-/// Message body returned as part of handle message routine.
+// SignedPacket is 240 bytes in stack (192 + 24 + 24), which means 5 times more than
+// the next biggest variant (TaggedPacket, 48 bytes), and the impossibility of inlining.
+// Boxing PublicKey would usually be a net performance improvement if SignedPacket wasn't frequent.
+// However, chances are it is the most frequent variant, therefore a profile must confirm there's
+// enough performance improvement to justify the ergonomic drawback of re-enabling this lint
 #[allow(clippy::large_enum_variant)]
+/// Message body returned as part of handle message routine.
 pub enum MessageContent {
     Announce,
     Keyload,
@@ -142,12 +145,10 @@ pub type UnwrappedMessage = message::GenericMessage<Address, MessageContent>;
 /// Generic binary message type for sequence handling
 pub type BinaryMessage = message::GenericMessage<Address, BinaryBody<DefaultF>>;
 
-#[allow(clippy::ptr_arg)]
 mod user;
 /// User object storing the Auth/Sub implementation as well as the transport instance
 pub use user::User;
 
-#[allow(clippy::ptr_arg)]
 mod author;
 /// Tangle-specific Channel Author type.
 pub use author::Author;

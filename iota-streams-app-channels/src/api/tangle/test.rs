@@ -1,6 +1,5 @@
 #![allow(non_snake_case)]
 use crate::api::tangle::{
-    Address,
     Author,
     Subscriber,
 };
@@ -33,12 +32,10 @@ pub fn example<T: Transport + Clone>(transport: T) -> Result<()> {
     let masked_payload = Bytes("MASKEDPAYLOAD".as_bytes().to_vec());
 
     println!("announce");
-    let (announcement_address, announcement_tag) = {
-        let msg = &author.send_announce()?;
-        println!("  {}", msg);
-        (msg.appinst.to_string(), msg.msgid.to_string())
-    };
-    let announcement_link = Address::from_str(&announcement_address, &announcement_tag).unwrap();
+    let msg = &author.send_announce()?;
+    let announcement_str = msg.to_string();
+    println!("  {}", announcement_str);
+    let announcement_link = announcement_str.parse().unwrap();
 
     {
         subscriberA.receive_announcement(&announcement_link)?;
@@ -149,12 +146,10 @@ pub async fn example<T: Transport + Clone>(transport: T) -> Result<()> where
     let masked_payload = Bytes("MASKEDPAYLOAD".as_bytes().to_vec());
 
     println!("announce");
-    let (announcement_address, announcement_tag) = {
-        let msg = &author.send_announce().await?;
-        println!("  {}", msg);
-        (msg.appinst.to_string(), msg.msgid.to_string())
-    };
-    let announcement_link = Address::from_str(&announcement_address, &announcement_tag).unwrap();
+    let msg = &author.send_announce().await?;
+    let announcement_str = msg.to_string();
+    println!("  {}", announcement_str);
+    let announcement_link = announcement_str.parse().unwrap();
 
     {
         subscriberA.receive_announcement(&announcement_link).await?;

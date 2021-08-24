@@ -64,9 +64,9 @@ impl From<ed25519::PublicKey> for Identifier {
     }
 }
 
-impl From<&PskId> for Identifier {
-    fn from(pskid: &PskId) -> Self {
-        Identifier::PskId(*pskid)
+impl From<PskId> for Identifier {
+    fn from(pskid: PskId) -> Self {
+        Identifier::PskId(pskid)
     }
 }
 

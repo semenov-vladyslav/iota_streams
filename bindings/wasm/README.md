@@ -23,5 +23,5 @@ npm run build:nodejs
 ```
 
 ```bash
-npm run example:node
+npm run example:nodejs
 ```

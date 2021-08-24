@@ -11,7 +11,7 @@ To build the library, first make sure you're in the wasm directory:
 
 For building the nodejs compatible api, run:
 ```bash
-npm run build:node  <- Builds to node/iota_streams_wasm
+npm run build:nodejs  <- Builds to node/iota_streams_wasm
 ```
 
 And for building the web compatible api, run:

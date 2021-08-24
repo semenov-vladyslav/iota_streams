@@ -34,7 +34,7 @@ pub fn example<T: Transport>(transport: Rc<RefCell<T>>, channel_type: ChannelTyp
     println!("\nAnnounce Channel");
     let announcement_link = {
         let msg = author.send_announce()?;
-        println!("  msg => <{}> {}", msg.msgid, msg);
+        println!("  msg => <{}> <{:x}>", msg.msgid, msg.to_msg_index());
         msg
     };
     println!("  Author channel address: {}", author.channel_address().unwrap());
@@ -45,7 +45,7 @@ pub fn example<T: Transport>(transport: Rc<RefCell<T>>, channel_type: ChannelTyp
     println!("\nSubscribe A");
     let subscribeA_link = {
         let msg = subscriberA.send_subscribe(&announcement_link)?;
-        println!("  msg => <{}> {}", msg.msgid, msg);
+        println!("  msg => <{}> <{:x}>", msg.msgid, msg.to_msg_index());
         msg
     };
 
@@ -55,7 +55,7 @@ pub fn example<T: Transport>(transport: Rc<RefCell<T>>, channel_type: ChannelTyp
     println!("\nShare keyload");
     let mut previous_msg_link = {
         let (msg, seq) = author.send_keyload_for_everyone(&announcement_link)?;
-        println!("  msg => <{}> {}", msg.msgid, msg);
+        println!("  msg => <{}> <{:x}>", msg.msgid, msg.to_msg_index());
         panic_if_not(seq.is_none());
         msg
     };
@@ -64,7 +64,7 @@ pub fn example<T: Transport>(transport: Rc<RefCell<T>>, channel_type: ChannelTyp
         println!("Signed packet {} - Author", i);
         previous_msg_link = {
             let (msg, seq) = author.send_signed_packet(&previous_msg_link, &public_payload, &masked_payload)?;
-            println!("  msg => <{}> {}", msg.msgid, msg);
+            println!("  msg => <{}> <{:x}>", msg.msgid, msg.to_msg_index());
             panic_if_not(seq.is_none());
             msg
         };
@@ -79,7 +79,7 @@ pub fn example<T: Transport>(transport: Rc<RefCell<T>>, channel_type: ChannelTyp
         println!("Tagged packet {} - SubscriberA", i);
         previous_msg_link = {
             let (msg, seq) = subscriberA.send_tagged_packet(&previous_msg_link, &public_payload, &masked_payload)?;
-            println!("  msg => <{}> {}", msg.msgid, msg);
+            println!("  msg => <{}> <{:x}>", msg.msgid, msg.to_msg_index());
             panic_if_not(seq.is_none());
             msg
         };
@@ -112,7 +112,7 @@ pub fn example<T: Transport>(transport: Rc<RefCell<T>>, channel_type: ChannelTyp
 
     println!("States match...\nSending next sequenced message...");
     let (last_msg, _seq) = new_author.send_signed_packet(latest_link, &public_payload, &masked_payload)?;
-    println!("  msg => <{}> {}", last_msg.msgid, last_msg);
+    println!("  msg => <{}> <{:x}>", last_msg.msgid, last_msg.to_msg_index());
 
     // Wait a second for message to propagate
     sleep(Duration::from_secs(1));

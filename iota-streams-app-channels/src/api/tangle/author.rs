@@ -171,15 +171,12 @@ impl<Trans: Transport + Clone> Author<Trans> {
     ///
     ///  # Arguments
     ///  * `link_to` - Address of the message the keyload will be attached to
-    ///  * `psk_ids` - Vector of Pre-shared key ids to be included in message
-    ///  * `ke_pks`  - Vector of Public Keys to be included in message
-    pub fn send_keyload(
-        &mut self,
-        link_to: &Address,
-        psk_ids: &PskIds,
-        ke_pks: &Vec<&Identifier>,
-    ) -> Result<(Address, Option<Address>)> {
-        self.user.send_keyload(link_to, psk_ids, ke_pks)
+    ///  * `keys`  - Iterable of [`Identifier`] to be included in message
+    pub fn send_keyload<'a, I>(&mut self, link_to: &Address, keys: I) -> Result<(Address, Option<Address>)>
+    where
+        I: IntoIterator<Item = &'a Identifier>,
+    {
+        self.user.send_keyload(link_to, keys)
     }
 
     /// Create and send keyload for all subscribed subscribers.
@@ -344,15 +341,12 @@ impl<Trans: Transport + Clone> Author<Trans> {
     ///
     ///  # Arguments
     ///  * `link_to` - Address of the message the keyload will be attached to
-    ///  * `psk_ids` - Vector of Pre-shared key ids to be included in message
-    ///  * `ke_pks`  - Vector of Public Keys to be included in message
-    pub async fn send_keyload(
-        &mut self,
-        link_to: &Address,
-        psk_ids: &PskIds,
-        ke_pks: &Vec<&Identifier>,
-    ) -> Result<(Address, Option<Address>)> {
-        self.user.send_keyload(link_to, psk_ids, ke_pks).await
+    ///  * `keys`  - Iterable of [`Identifier`] to be included in message
+    pub async fn send_keyload<'a, I>(&mut self, link_to: &Address, keys: I) -> Result<(Address, Option<Address>)>
+    where
+        I: IntoIterator<Item = &'a Identifier>,
+    {
+        self.user.send_keyload(link_to, keys).await
     }
 
     /// Create and send keyload for all subscribed subscribers.

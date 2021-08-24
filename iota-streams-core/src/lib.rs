@@ -1,6 +1,4 @@
 #![no_std]
-// TODO: Remove this after clippy fixes their false positive bug [https://github.com/rust-lang/rust-clippy/issues/7434]
-#![allow(clippy::nonstandard_macro_braces)]
 //#![feature(generic_associated_types)]
 
 #[cfg(not(feature = "std"))]

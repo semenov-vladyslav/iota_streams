@@ -21,7 +21,6 @@ use iota_streams_core::{
     prelude::{
         string::ToString,
         typenum::U32,
-        vec,
         Vec,
     },
     prng,
@@ -58,66 +57,43 @@ use crate::{
         ChannelType,
     },
     message::*,
+    Lookup,
 };
 
 const ANN_MESSAGE_NUM: u32 = 0;
 const SUB_MESSAGE_NUM: u32 = 0;
 const SEQ_MESSAGE_NUM: u32 = 1;
 
-/// Wrapped sequencing information with optional WrapState
-pub struct WrapStateSequence<F, Link: HasLink>(
-    pub(crate) Cursor<<Link as HasLink>::Rel>,
-    pub(crate) Option<WrapState<F, Link>>,
-);
-
-impl<F, Link: HasLink> WrapStateSequence<F, Link> {
-    pub fn new(cursor: Cursor<<Link as HasLink>::Rel>) -> Self {
-        Self(cursor, None)
-    }
-
-    pub fn with_state(mut self, state: WrapState<F, Link>) -> Self {
-        self.1 = Some(state);
-        self
-    }
-
-    pub fn set_state(&mut self, state: WrapState<F, Link>) {
-        self.1 = Some(state);
-    }
-}
-
-impl<F: PRP, Link: HasLink + fmt::Debug> fmt::Debug for WrapStateSequence<F, Link>
+/// Sequence wrapping object
+///
+/// When using multibranch mode, this wrapping object contains the (wrapped) sequence message ([`WrappedMessage`]) to be
+/// sent and the [`Cursor`] of the user sending it.
+///
+/// When using single-branch mode, only the [`Cursor`] is needed, and no sequence message is sent.
+pub enum WrappedSequence<F, Link>
 where
-    <Link as HasLink>::Rel: fmt::Debug,
+    Link: HasLink,
 {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "({:?},{:?})", self.0, self.1)
-    }
+    MultiBranch(Cursor<Link::Rel>, WrappedMessage<F, Link>),
+    SingleBranch(Cursor<Link::Rel>),
+    // Consider removing this option and returning Err instead
+    None,
 }
 
-/// Wrapped object containing an optional message and associated sequence state
-pub struct WrappedSequence<F, Link: HasLink>(
-    pub(crate) Option<BinaryMessage<F, Link>>,
-    pub(crate) Option<WrapStateSequence<F, Link>>,
-);
-
-impl<F, Link: HasLink> WrappedSequence<F, Link> {
-    #[allow(clippy::new_without_default)]
-    pub fn new() -> Self {
-        Self(None, None)
+impl<F, Link> WrappedSequence<F, Link>
+where
+    Link: HasLink,
+{
+    pub fn single_branch(cursor: Cursor<Link::Rel>) -> Self {
+        Self::SingleBranch(cursor)
     }
 
-    pub fn with_cursor(mut self, cursor: Cursor<<Link as HasLink>::Rel>) -> Self {
-        self.1 = Some(WrapStateSequence::new(cursor));
-        self
+    pub fn multi_branch(cursor: Cursor<Link::Rel>, wrapped_message: WrappedMessage<F, Link>) -> Self {
+        Self::MultiBranch(cursor, wrapped_message)
     }
 
-    pub fn with_wrapped(mut self, m: WrappedMessage<F, Link>) -> Self {
-        self.0 = Some(m.message);
-        let wrapped = m.wrapped;
-        if let Some(w) = self.1.as_mut() {
-            w.set_state(wrapped)
-        }
-        self
+    pub fn none() -> Self {
+        Self::None
     }
 }
 
@@ -194,6 +170,9 @@ where
         }
     }
 }
+
+// Alias needed to reduce complexity of `unwrap_keyload` return value
+type KeyloadContentUnwrap<'a, F, Link, User> = keyload::ContentUnwrap<'a, F, Link, &'a User, &'a User>;
 
 impl<F, Link, LG, LS, Keys> User<F, Link, LG, LS, Keys>
 where
@@ -431,36 +410,33 @@ where
         Ok(())
     }
 
-    fn do_prepare_keyload<'a, KePks>(
+    fn do_prepare_keyload<'a>(
         &'a self,
         header: HDF<Link>,
-        link_to: &'a <Link as HasLink>::Rel,
-        ke_pks: KePks,
-    ) -> Result<PreparedMessage<'a, F, Link, LS, keyload::ContentWrap<'a, F, Link, KePks>>>
-    where
-        KePks: Clone + ExactSizeIterator<Item = (&'a Identifier, Vec<u8>)>,
-    {
+        link_to: &'a Link::Rel,
+        keys: Vec<(&'a Identifier, Vec<u8>)>,
+    ) -> Result<PreparedMessage<'a, F, Link, LS, keyload::ContentWrap<'a, F, Link>>> {
         let nonce = NBytes::from(prng::random_nonce());
         let key = NBytes::from(prng::random_key());
         let content = keyload::ContentWrap {
             link: link_to,
             nonce,
             key,
-            keys: ke_pks,
+            keys,
             sig_kp: &self.sig_kp,
             _phantom: core::marker::PhantomData,
         };
         Ok(PreparedMessage::new(self.link_store.borrow(), header, content))
     }
 
-    pub fn prepare_keyload<'a>(
+    pub fn prepare_keyload<'a, 'b, I>(
         &'a mut self,
         link_to: &'a Link,
-        _psk_ids: &psk::PskIds,
-        pks: &'a Vec<&Identifier>,
-    ) -> Result<
-        PreparedMessage<'a, F, Link, LS, keyload::ContentWrap<'a, F, Link, vec::IntoIter<(&Identifier, Vec<u8>)>>>,
-    > {
+        keys: I,
+    ) -> Result<PreparedMessage<'a, F, Link, LS, keyload::ContentWrap<'a, F, Link>>>
+    where
+        I: IntoIterator<Item = &'b Identifier>,
+    {
         match self.get_seq_no() {
             Some(seq_no) => {
                 let msg_link = self
@@ -472,8 +448,8 @@ where
                     .with_payload_length(1)?
                     .with_seq_num(seq_no)
                     .with_identifier(&self.sig_kp.public.into());
-                let keys = self.key_store.filter(pks);
-                self.do_prepare_keyload(header, link_to.rel(), keys.into_iter())
+                let filtered_keys = self.key_store.filter(keys);
+                self.do_prepare_keyload(header, link_to.rel(), filtered_keys)
             }
             None => err!(SeqNumRetrievalFailure),
         }
@@ -482,9 +458,7 @@ where
     pub fn prepare_keyload_for_everyone<'a>(
         &'a mut self,
         link_to: &'a Link,
-    ) -> Result<
-        PreparedMessage<'a, F, Link, LS, keyload::ContentWrap<'a, F, Link, vec::IntoIter<(&'a Identifier, Vec<u8>)>>>,
-    > {
+    ) -> Result<PreparedMessage<'a, F, Link, LS, keyload::ContentWrap<'a, F, Link>>> {
         match self.get_seq_no() {
             Some(seq_no) => {
                 let msg_link = self
@@ -496,8 +470,8 @@ where
                     .with_payload_length(1)?
                     .with_seq_num(seq_no)
                     .with_identifier(&self.sig_kp.public.into());
-                let ike_pks = self.key_store.keys();
-                self.do_prepare_keyload(header, link_to.rel(), ike_pks.into_iter())
+                let keys = self.key_store.keys();
+                self.do_prepare_keyload(header, link_to.rel(), keys)
             }
             None => err!(SeqNumRetrievalFailure),
         }
@@ -505,13 +479,11 @@ where
 
     /// Create keyload message with a new session key shared with recipients
     /// identified by pre-shared key IDs and by Ed25519 public keys.
-    pub fn share_keyload(
-        &mut self,
-        link_to: &Link,
-        psk_ids: &psk::PskIds,
-        ke_pks: &Vec<&Identifier>,
-    ) -> Result<WrappedMessage<F, Link>> {
-        self.prepare_keyload(link_to, psk_ids, ke_pks)?.wrap()
+    pub fn share_keyload<'a, I>(&mut self, link_to: &Link, keys: I) -> Result<WrappedMessage<F, Link>>
+    where
+        I: IntoIterator<Item = &'a Identifier>,
+    {
+        self.prepare_keyload(link_to, keys)?.wrap()
     }
 
     /// Create keyload message with a new session key shared with all Subscribers
@@ -520,50 +492,13 @@ where
         self.prepare_keyload_for_everyone(link_to)?.wrap()
     }
 
-    fn lookup_psk(&self, pskid: &Identifier) -> Option<psk::Psk> {
-        self.key_store.get_psk(pskid)
-    }
-
-    fn lookup_ke_sk<'b>(&'b self, ke_pk: &Identifier) -> Option<&'b x25519::StaticSecret> {
-        match ke_pk.get_pk() {
-            Some(pk) => {
-                if &self.sig_kp.public == pk {
-                    Some(&self.ke_kp.0)
-                } else {
-                    None
-                }
-            }
-            None => None,
-        }
-    }
-
     pub fn unwrap_keyload<'a, 'b>(
         &'b self,
         preparsed: PreparsedMessage<'a, F, Link>,
-    ) -> Result<
-        UnwrappedMessage<
-            F,
-            Link,
-            keyload::ContentUnwrap<
-                'b,
-                F,
-                Link,
-                Self,
-                for<'c> fn(&'c Self, &Identifier) -> Option<psk::Psk>,
-                for<'c> fn(&'c Self, &Identifier) -> Option<&'c x25519::StaticSecret>,
-            >,
-        >,
-    > {
+    ) -> Result<UnwrappedMessage<F, Link, KeyloadContentUnwrap<'b, F, Link, Self>>> {
         self.ensure_appinst(&preparsed)?;
         if let Some(ref author_sig_pk) = self.author_sig_pk {
-            let content = keyload::ContentUnwrap::<
-                'b,
-                F,
-                Link,
-                Self,
-                for<'c> fn(&'c Self, &Identifier) -> Option<psk::Psk>,
-                for<'c> fn(&'c Self, &Identifier) -> Option<&'c x25519::StaticSecret>,
-            >::new(self, Self::lookup_psk, Self::lookup_ke_sk, author_sig_pk);
+            let content = keyload::ContentUnwrap::new(self, self, author_sig_pk);
             let unwrapped = preparsed.unwrap(&*self.link_store.borrow(), content)?;
             Ok(unwrapped)
         } else {
@@ -745,7 +680,7 @@ where
         preparsed: PreparsedMessage<'_, F, Link>,
     ) -> Result<UnwrappedMessage<F, Link, tagged_packet::ContentUnwrap<F, Link>>> {
         self.ensure_appinst(&preparsed)?;
-        let content = tagged_packet::ContentUnwrap::new();
+        let content = tagged_packet::ContentUnwrap::default();
         preparsed.unwrap(&*self.link_store.borrow(), content)
     }
 
@@ -825,7 +760,7 @@ where
                         prepared.wrap()?
                     };
 
-                    Ok(WrappedSequence::new().with_cursor(cursor).with_wrapped(wrapped))
+                    Ok(WrappedSequence::multi_branch(cursor, wrapped))
                 } else {
                     let msg_link = self.link_gen.link_from(
                         &self.sig_kp.public.into(),
@@ -833,34 +768,31 @@ where
                     );
 
                     cursor.link = msg_link.rel().clone();
-                    Ok(WrappedSequence::new().with_cursor(cursor))
+                    Ok(WrappedSequence::single_branch(cursor))
                 }
             }
-            None => Ok(WrappedSequence::new()),
+            None => Ok(WrappedSequence::none()),
         }
     }
 
     pub fn commit_sequence(
         &mut self,
-        wrapped: WrapStateSequence<F, Link>,
-        info: <LS as LinkStore<F, <Link as HasLink>::Rel>>::Info,
+        mut cursor: Cursor<Link::Rel>,
+        wrapped_state: WrapState<F, Link>,
+        info: LS::Info,
     ) -> Result<Option<Link>> {
-        let mut cursor = wrapped.0;
-        match wrapped.1 {
-            Some(wrapped) => {
-                let link = wrapped.link.clone();
-                cursor.link = wrapped.link.rel().clone();
-                cursor.next_seq();
-                wrapped.commit(self.link_store.borrow_mut(), info)?;
-                self.key_store
-                    .insert_cursor(Identifier::EdPubKey(self.sig_kp.public.into()), cursor)?;
-                Ok(Some(link))
-            }
-            None => {
-                self.store_state_for_all(cursor.link, cursor.seq_no + 1)?;
-                Ok(None)
-            }
-        }
+        cursor.link = wrapped_state.link.rel().clone();
+        cursor.next_seq();
+        self.key_store
+            .insert_cursor(Identifier::EdPubKey(self.sig_kp.public.into()), cursor)?;
+        let link = wrapped_state.link.clone();
+        wrapped_state.commit(self.link_store.borrow_mut(), info)?;
+        Ok(Some(link))
+    }
+
+    pub fn commit_sequence_to_all(&mut self, cursor: Cursor<Link::Rel>) -> Result<()> {
+        self.store_state_for_all(cursor.link, cursor.seq_no + 1)?;
+        Ok(())
     }
 
     pub fn unwrap_sequence(
@@ -925,9 +857,9 @@ where
                     return err(StateStoreFailure);
                 }
 
-                if !self.key_store.contains(&Identifier::from(&pskid)) {
+                if !self.key_store.contains(&pskid.into()) {
                     self.key_store.insert_psk(
-                        (&pskid).into(),
+                        pskid.into(),
                         Some(psk),
                         Cursor::new_at(appinst.rel().clone(), 0, 2_u32),
                     )?;
@@ -1309,5 +1241,36 @@ where
         user.unwrap(&store, &mut ctx)?;
         try_or!(ctx.stream.is_empty(), InputStreamNotFullyConsumed(ctx.stream.len()))?;
         Ok(user)
+    }
+}
+
+impl<'a, F, Link, LG, LS, Keys> Lookup<&Identifier, psk::Psk> for &'a User<F, Link, LG, LS, Keys>
+where
+    F: PRP,
+    Link: HasLink,
+    Keys: KeyStore<Cursor<Link::Rel>, F>,
+{
+    fn lookup(&self, psk_id: &Identifier) -> Option<psk::Psk> {
+        self.key_store.get_psk(psk_id)
+    }
+}
+
+impl<'a, F, Link, LG, LS, Keys> Lookup<&Identifier, &'a x25519::StaticSecret> for &'a User<F, Link, LG, LS, Keys>
+where
+    F: PRP,
+    Link: HasLink,
+    Keys: KeyStore<Cursor<Link::Rel>, F>,
+{
+    fn lookup(&self, ke_pk: &Identifier) -> Option<&'a x25519::StaticSecret> {
+        match ke_pk.get_pk() {
+            Some(pk) => {
+                if &self.sig_kp.public == pk {
+                    Some(&self.ke_kp.0)
+                } else {
+                    None
+                }
+            }
+            None => None,
+        }
     }
 }

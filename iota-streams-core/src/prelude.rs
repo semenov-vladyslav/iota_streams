@@ -4,6 +4,7 @@ pub use alloc::{
         self,
         Box,
     },
+    format,
     rc::{
         self,
         Rc,
@@ -29,6 +30,7 @@ pub use std::{
         self,
         Box,
     },
+    format,
     rc::{
         self,
         Rc,
