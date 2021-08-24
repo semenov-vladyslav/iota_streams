@@ -15,7 +15,7 @@ use iota_streams_core::{
 use iota_streams_core_edsig::key_exchange::x25519;
 
 pub trait KeyStore<Info, F: PRP>: Default {
-    fn filter<'a, I>(&self, pks: I) -> Vec<(&Identifier, Vec<u8>)>
+    fn filter<'a, I>(&self, ids: I) -> Vec<(&Identifier, Vec<u8>)>
     where
         I: IntoIterator<Item = &'a Identifier>;
 
