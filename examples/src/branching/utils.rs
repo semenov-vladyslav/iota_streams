@@ -1,5 +1,5 @@
 use iota_streams::{
-    app::message::HasLink as _,
+    app::message::HasLink,
     app_channels::api::tangle::{
         Author,
         Subscriber,

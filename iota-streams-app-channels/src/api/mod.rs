@@ -9,7 +9,7 @@ pub mod key_store;
 pub mod user;
 
 /// Tangle-specific Channel API.
-#[cfg(all(feature = "tangle"))]
+#[cfg(feature = "tangle")]
 pub mod tangle;
 
 #[derive(Clone)]
@@ -19,12 +19,14 @@ pub enum ChannelType {
     SingleDepth,
 }
 
-use iota_streams_core::psk;
 pub use iota_streams_core::psk::{
     Psk,
     PskId,
 };
-use iota_streams_core_keccak::sponge::prp::keccak::KeccakF1600;
+use iota_streams_core::{
+    psk,
+    sponge::prp::keccak::KeccakF1600,
+};
 
 /// Default spongos PRP.
 pub type DefaultF = KeccakF1600;

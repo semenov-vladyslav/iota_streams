@@ -12,7 +12,7 @@ use crate::{
         digest::Digest,
         generic_array::{
             typenum::{
-                Unsigned as _,
+                Unsigned,
                 U2,
             },
             ArrayLength,
@@ -23,7 +23,8 @@ use crate::{
     try_or,
     Errors::{
         LengthMismatch,
-        SpongosNotCommitted,
+        SpongosInputNotCommitted,
+        SpongosKeyNotCommitted,
     },
     Result,
 };
@@ -77,38 +78,53 @@ fn equals(s: &[u8], x: &[u8]) -> bool {
     eq
 }
 
-/// Sponge fixed key size in buf.
-pub type KeySize<F> = <F as PRP>::CapacitySize;
-pub type KeyType<F> = GenericArray<u8, KeySize<F>>;
-
-/// Sponge fixed nonce size in buf.
-pub type NonceSize<F> = <F as PRP>::CapacitySize;
-pub type NonceType<F> = GenericArray<u8, NonceSize<F>>;
-
-/// Sponge fixed hash size in buf.
-pub type HashSize<F> = <F as PRP>::CapacitySize;
-
-/// Sponge fixed MAC size in buf.
-pub type MacSize<F> = <F as PRP>::CapacitySize;
+/// Current operation is processing input: absorb or mask or join.
+const PROCESSING_INPUT: u8 = 1_u8;
+/// Current operation is producing output: squeeze or mask.
+const PRODUCING_OUTPUT: u8 = 2_u8;
+/// Key is being absorbed, it must be committed before keyed
+/// operations mask and tag.
+const KEY_ABSORB: u8 = 4_u8;
+/// Key must be committed for keyed operations: mask and tag.
+const KEY_COMMITTED: u8 = KEY_ABSORB << 1;
 
 #[derive(Clone)]
 pub struct Spongos<F> {
     /// Spongos transform together with its internal state.
     s: F,
 
+    /// Flags provide run-time checks against forbidden operations
+    /// that are allowed at compile time.
+    flags: u8,
+
     /// Current position (offset in bytes) within the outer state.
     pos: usize,
 }
 
 impl<F: PRP> Spongos<F> {
-    /// Create a Spongos object, initialize state with zero trits.
+    /// Create a Spongos object, initialize state with zero bytes.
     pub fn init() -> Self {
         Self::init_with_state(F::default())
     }
 
+    /// Init spongos to work in a specific domain.
+    /// Domain can include application name and/or
+    /// description of the spongos operations to follow.
+    pub fn init_with_domain(domain: &[u8]) -> Self {
+        // TODO: implement Spongos::init_with_domain more efficiently.
+        let mut s = Self::init();
+        s.absorb(domain);
+        s.commit();
+        s
+    }
+
+    pub fn flags(&self) -> u8 {
+        self.flags
+    }
+
     /// Create a Spongos object with an explicit state.
     pub fn init_with_state(s: F) -> Self {
-        Self { s, pos: 0 }
+        Self { s, flags: 0, pos: 0 }
     }
 
     fn outer_min_mut(&mut self, n: usize) -> &mut [u8] {
@@ -116,7 +132,7 @@ impl<F: PRP> Spongos<F> {
         &mut self.s.outer_mut()[self.pos..m]
     }
 
-    /// Update Spongos after processing the current piece of data of `n` trits.
+    /// Update Spongos after processing the current piece of data of `n` bytes.
     fn update(&mut self, n: usize) {
         self.pos += n;
         if F::RateSize::USIZE == self.pos {
@@ -124,8 +140,8 @@ impl<F: PRP> Spongos<F> {
         }
     }
 
-    /// Absorb a slice into Spongos object.
-    pub fn absorb(&mut self, xr: impl AsRef<[u8]>) {
+    /// Absorb a byte slice into Spongos object.
+    fn do_absorb(&mut self, xr: impl AsRef<[u8]>) {
         let mut x = xr.as_ref();
         while !x.is_empty() {
             let s = self.outer_min_mut(x.len());
@@ -136,8 +152,24 @@ impl<F: PRP> Spongos<F> {
         }
     }
 
-    /// Squeeze a trit slice from Spongos object.
-    pub fn squeeze(&mut self, mut yr: impl AsMut<[u8]>) {
+    /// Absorb public/plain data.
+    pub fn absorb(&mut self, xr: impl AsRef<[u8]>) {
+        // No restriction on absorbing plain data,
+        // it can be done after any other operation.
+        self.flags |= PROCESSING_INPUT;
+        self.do_absorb(xr)
+    }
+
+    /// Absorb secret key.
+    pub fn absorb_key(&mut self, xr: impl AsRef<[u8]>) {
+        // No restriction on absorbing secret keys,
+        // it can be done after any other operation.
+        self.flags |= PROCESSING_INPUT | KEY_ABSORB;
+        self.do_absorb(xr)
+    }
+
+    /// Squeeze a byte slice from Spongos object.
+    fn squeeze_unchecked(&mut self, mut yr: impl AsMut<[u8]>) {
         let mut y = yr.as_mut();
         while !y.is_empty() {
             let s = self.outer_min_mut(y.len());
@@ -148,8 +180,8 @@ impl<F: PRP> Spongos<F> {
         }
     }
 
-    /// Squeeze a trit slice from Spongos object and compare.
-    pub fn squeeze_eq(&mut self, yr: impl AsRef<[u8]>) -> bool {
+    /// Squeeze a byte slice from Spongos object and compare.
+    fn squeeze_eq_unchecked(&mut self, yr: impl AsRef<[u8]>) -> bool {
         let mut y = yr.as_ref();
         let mut eq = true;
         while !y.is_empty() {
@@ -162,23 +194,61 @@ impl<F: PRP> Spongos<F> {
         eq
     }
 
+    /// Squeeze hash from Spongos object.
+    pub fn squeeze(&mut self, yr: impl AsMut<[u8]>) -> Result<()> {
+        // Can't squeeze hash after absorbing data without committing it.
+        try_or!(0 == self.flags & PROCESSING_INPUT, SpongosInputNotCommitted)?;
+        self.flags |= PRODUCING_OUTPUT;
+        self.squeeze_unchecked(yr);
+        Ok(())
+    }
+
+    /// Squeeze and compare hash.
+    pub fn squeeze_eq(&mut self, yr: impl AsRef<[u8]>) -> Result<bool> {
+        // Can't squeeze hash after absorbing data without committing it.
+        try_or!(0 == self.flags & PROCESSING_INPUT, SpongosInputNotCommitted)?;
+        self.flags |= PRODUCING_OUTPUT;
+        Ok(self.squeeze_eq_unchecked(yr))
+    }
+
+    /// Squeeze tag from Spongos object.
+    pub fn squeeze_tag(&mut self, yr: impl AsMut<[u8]>) -> Result<()> {
+        // Can't squeeze tag after absorbing data without committing it.
+        try_or!(0 == self.flags & PROCESSING_INPUT, SpongosInputNotCommitted)?;
+        // Can't squeeze tag without having a key committed.
+        try_or!(0 != self.flags & KEY_COMMITTED, SpongosKeyNotCommitted)?;
+        self.flags |= PRODUCING_OUTPUT;
+        self.squeeze_unchecked(yr);
+        Ok(())
+    }
+
+    /// Squeeze and compare tag.
+    pub fn squeeze_tag_eq(&mut self, yr: impl AsRef<[u8]>) -> Result<bool> {
+        // Can't squeeze tag after absorbing data without committing it.
+        try_or!(0 == self.flags & PROCESSING_INPUT, SpongosInputNotCommitted)?;
+        // Can't squeeze tag without having a key committed.
+        try_or!(0 != self.flags & KEY_COMMITTED, SpongosKeyNotCommitted)?;
+        self.flags |= PRODUCING_OUTPUT;
+        Ok(self.squeeze_eq_unchecked(yr))
+    }
+
     /// Squeeze array, length inferred from output type.
-    pub fn squeeze_arr<N: ArrayLength<u8>>(&mut self) -> GenericArray<u8, N> {
+    pub fn squeeze_arr<N: ArrayLength<u8>>(&mut self) -> Result<GenericArray<u8, N>> {
         let mut y = GenericArray::default();
-        self.squeeze(&mut y);
-        y
+        self.squeeze(&mut y)?;
+        Ok(y)
     }
 
     /// Squeeze vector, length is known at runtime.
-    pub fn squeeze_n(&mut self, n: usize) -> Vec<u8> {
+    pub fn squeeze_n(&mut self, n: usize) -> Result<Vec<u8>> {
         let mut v = vec![0; n];
-        self.squeeze(&mut v);
-        v
+        self.squeeze(&mut v)?;
+        Ok(v)
     }
 
     /// Encrypt a byte slice with Spongos object.
     /// Input and output slices must be non-overlapping.
-    pub fn encrypt(&mut self, xr: impl AsRef<[u8]>, mut yr: impl AsMut<[u8]>) -> Result<()> {
+    fn encrypt_unchecked(&mut self, xr: impl AsRef<[u8]>, mut yr: impl AsMut<[u8]>) -> Result<()> {
         let mut x = xr.as_ref();
         let mut y = yr.as_mut();
         try_or!(x.len() == y.len(), LengthMismatch(x.len(), y.len()))?;
@@ -193,8 +263,8 @@ impl<F: PRP> Spongos<F> {
         Ok(())
     }
 
-    /// Encrypt in-place a trit slice with Spongos object.
-    pub fn encrypt_mut(&mut self, mut xyr: impl AsMut<[u8]>) {
+    /// Encrypt in-place a byte slice with Spongos object.
+    fn encrypt_mut_unchecked(&mut self, mut xyr: impl AsMut<[u8]>) {
         let mut xy = xyr.as_mut();
         while !xy.is_empty() {
             let s = self.outer_min_mut(xy.len());
@@ -205,22 +275,56 @@ impl<F: PRP> Spongos<F> {
         }
     }
 
-    /// Encrypt buf.
+    /// Encrypt plain text.
+    /// Input and output slices must be non-overlapping.
+    pub fn encrypt(&mut self, xr: impl AsRef<[u8]>, yr: impl AsMut<[u8]>) -> Result<()> {
+        // Can't encrypt data without having a key committed.
+        try_or!(0 != self.flags & KEY_COMMITTED, SpongosKeyNotCommitted)?;
+        self.flags |= PROCESSING_INPUT | PRODUCING_OUTPUT;
+        self.encrypt_unchecked(xr, yr)
+    }
+
+    /// Encrypt in-place a byte slice with Spongos object.
+    pub fn encrypt_mut(&mut self, xyr: impl AsMut<[u8]>) -> Result<()> {
+        // Can't encrypt data without having a key committed.
+        try_or!(0 != self.flags & KEY_COMMITTED, SpongosKeyNotCommitted)?;
+        self.flags |= PROCESSING_INPUT | PRODUCING_OUTPUT;
+        self.encrypt_mut_unchecked(xyr);
+        Ok(())
+    }
+
+    /// Encrypt plaintext into fixed-length array.
     pub fn encrypt_arr<N: ArrayLength<u8>>(&mut self, x: &GenericArray<u8, N>) -> Result<GenericArray<u8, N>> {
         let mut y = GenericArray::default();
         self.encrypt(x, &mut y)?;
         Ok(y)
     }
 
+    /// Encrypt plaintext into vector.
     pub fn encrypt_n(&mut self, x: impl AsRef<[u8]>) -> Result<Vec<u8>> {
         let mut y = vec![0; x.as_ref().len()];
         self.encrypt(x, &mut y)?;
         Ok(y)
     }
 
+    /// Try to encrypt 1 byte, it's allowed to encrypt a zero byte without key.
+    pub fn encrypt1z(&mut self, x: u8) -> Result<u8> {
+        let has_key_committed = 0 != self.flags & KEY_COMMITTED;
+        try_or!(0 == x || has_key_committed, SpongosKeyNotCommitted)?;
+        self.flags |= PROCESSING_INPUT | PRODUCING_OUTPUT;
+
+        let mut xy = [x];
+        let s = self.outer_min_mut(1);
+        encrypt_xor_mut(s, &mut xy);
+        self.update(1);
+        let y = xy[0];
+
+        Ok(y)
+    }
+
     /// Decrypt a byte slice with Spongos object.
     /// Input and output slices must be non-overlapping.
-    pub fn decrypt(&mut self, yr: impl AsRef<[u8]>, mut xr: impl AsMut<[u8]>) -> Result<()> {
+    fn decrypt_unchecked(&mut self, yr: impl AsRef<[u8]>, mut xr: impl AsMut<[u8]>) -> Result<()> {
         let mut y = yr.as_ref();
         let mut x = xr.as_mut();
         try_or!(x.len() == y.len(), LengthMismatch(x.len(), y.len()))?;
@@ -236,33 +340,67 @@ impl<F: PRP> Spongos<F> {
     }
 
     /// Decrypt in-place a byte slice with Spongos object.
-    pub fn decrypt_mut(&mut self, mut xyr: impl AsMut<[u8]>) {
-        let mut xy = xyr.as_mut();
-        while !xy.is_empty() {
-            let s = self.outer_min_mut(xy.len());
+    fn decrypt_mut_unchecked(&mut self, mut yxr: impl AsMut<[u8]>) {
+        let mut yx = yxr.as_mut();
+        while !yx.is_empty() {
+            let s = self.outer_min_mut(yx.len());
             let n = s.len();
-            decrypt_xor_mut(s, &mut xy[..n]);
-            xy = &mut xy[n..];
+            decrypt_xor_mut(s, &mut yx[..n]);
+            yx = &mut yx[n..];
             self.update(n);
         }
     }
 
-    /// Decrypt buf.
-    pub fn decrypt_arr<N: ArrayLength<u8>>(&mut self, y: impl AsRef<[u8]>) -> Result<GenericArray<u8, N>> {
+    /// Decrypt cipher text.
+    /// Input and output slices must be non-overlapping.
+    pub fn decrypt(&mut self, yr: impl AsRef<[u8]>, xr: impl AsMut<[u8]>) -> Result<()> {
+        // Can't decrypt data without having a key committed.
+        try_or!(0 != self.flags & KEY_COMMITTED, SpongosKeyNotCommitted)?;
+        self.flags |= PROCESSING_INPUT | PRODUCING_OUTPUT;
+        self.decrypt_unchecked(yr, xr)
+    }
+
+    /// Decrypt cipher text in-place.
+    pub fn decrypt_mut(&mut self, yxr: impl AsMut<[u8]>) -> Result<()> {
+        // Can't decrypt data without having a key committed.
+        try_or!(0 != self.flags & KEY_COMMITTED, SpongosKeyNotCommitted)?;
+        self.flags |= PROCESSING_INPUT | PRODUCING_OUTPUT;
+        self.decrypt_mut_unchecked(yxr);
+        Ok(())
+    }
+
+    /// Decrypt cipher text into fixed-length array.
+    pub fn decrypt_arr<N: ArrayLength<u8>>(&mut self, y: &GenericArray<u8, N>) -> Result<GenericArray<u8, N>> {
         let mut x = GenericArray::default();
         self.decrypt(y, &mut x)?;
         Ok(x)
     }
 
+    /// Decrypt cipher text into vector.
     pub fn decrypt_n(&mut self, y: impl AsRef<[u8]>) -> Result<Vec<u8>> {
         let mut x = vec![0; y.as_ref().len()];
         self.decrypt(y, &mut x)?;
         Ok(x)
     }
 
+    /// Try to decrypt 1 byte, it's allowed to decrypt a zero byte without key.
+    pub fn decrypt1z(&mut self, y: u8) -> Result<u8> {
+        let had_key_committed = 0 != self.flags & KEY_COMMITTED;
+        self.flags |= PROCESSING_INPUT | PRODUCING_OUTPUT;
+
+        let mut yx = [y];
+        let s = self.outer_min_mut(1);
+        decrypt_xor_mut(s, &mut yx);
+        self.update(1);
+        let x = yx[0];
+
+        try_or!(0 == x || had_key_committed, SpongosKeyNotCommitted)?;
+        Ok(x)
+    }
+
     /// Force transform even if for incomplete (but non-empty!) outer state.
     /// Commit with empty outer state has no effect.
-    pub fn commit(&mut self) {
+    fn do_commit(&mut self) {
         if self.pos != 0 {
             for o in &mut self.s.outer_mut()[self.pos..] {
                 *o = 0
@@ -272,24 +410,56 @@ impl<F: PRP> Spongos<F> {
         }
     }
 
-    /// Check whether spongos state is committed.
+    /// Force transform even if for incomplete (but non-empty!) outer state.
+    /// Commit with empty outer state has no effect.
+    pub fn commit(&mut self) {
+        // Do we have a key absorbed?
+        let key_absorb = self.flags & KEY_ABSORB;
+        // If so, let's commit it.
+        let key_committed = key_absorb << 1;
+        // It'll stay committed forever.
+        self.flags |= key_committed;
+        // We no longer process any input or produce any output.
+        self.flags &= !(PROCESSING_INPUT | PRODUCING_OUTPUT | KEY_ABSORB);
+        self.do_commit()
+    }
+
+    /// Check whether Spongos state is committed.
     pub fn is_committed(&self) -> bool {
         0 == self.pos
     }
 
+    /// Check whether Spongos state has key committed.
+    pub fn has_key(&self) -> bool {
+        0 != self.flags & KEY_COMMITTED
+    }
+
     /// Join two Spongos objects.
     /// Joiner -- self -- object absorbs data squeezed from joinee.
-    pub fn join(&mut self, joinee: &mut Self) {
+    fn do_join(&mut self, joinee: &mut Self) {
         joinee.commit();
-        // Clear outer state, this is equivalent to having joinee initialized from inner state
-        // as join must work in the same way for full and trimmed spongos.
+        // Clear outer state, this is equivalent to having joinee initialized
+        // from inner state as join must work in the same way for full and
+        // trimmed Spongos.
         for o in joinee.s.outer_mut() {
             *o = 0;
         }
         joinee.s.transform();
         let mut x = GenericArray::<u8, F::CapacitySize>::default();
-        joinee.squeeze(x.as_mut());
+        joinee.squeeze(x.as_mut()).unwrap();
         self.absorb(x.as_ref());
+    }
+
+    /// Join two Spongos objects.
+    /// Joiner -- self -- object absorbs data squeezed from joinee.
+    pub fn join(&mut self, joinee: &mut Self) {
+        self.do_join(joinee);
+        // Joinee has key committed?
+        let key_committed = joinee.flags & KEY_COMMITTED;
+        // If so, after the join we essentially absorbed a key.
+        let key_absorb = key_committed >> 1;
+        // So need to update flags. Don't forget to commit before mask and tag.
+        self.flags |= key_absorb;
     }
 
     /// Fork Spongos object into another.
@@ -306,9 +476,13 @@ impl<F: PRP> Spongos<F> {
 
     /// Only `inner` part of the state may be serialized.
     /// State should be committed.
-    pub fn to_inner(&self) -> Result<Inner<F>> {
-        try_or!(self.is_committed(), SpongosNotCommitted)?;
-        Ok(self.s.inner().clone().into())
+    pub fn to_inner(mut self) -> Inner<F> {
+        self.commit();
+        Inner::new(self.s.inner().clone(), self.flags)
+    }
+
+    pub fn get_inner(&self) -> Inner<F> {
+        self.clone().to_inner()
     }
 }
 
@@ -320,8 +494,10 @@ impl<F: PRP> Default for Spongos<F> {
 
 impl<F: PRP> From<Inner<F>> for Spongos<F> {
     fn from(inner: Inner<F>) -> Self {
+        let flags = inner.flags;
         Self {
             s: F::from_inner(&inner.into()),
+            flags,
             pos: 0,
         }
     }
@@ -331,20 +507,15 @@ impl<F: PRP> From<&Inner<F>> for Spongos<F> {
     fn from(inner: &Inner<F>) -> Self {
         Self {
             s: F::from_inner(inner.into()),
+            flags: inner.flags,
             pos: 0,
         }
     }
 }
 
 impl<F: PRP> From<Spongos<F>> for Inner<F> {
-    fn from(inner: Spongos<F>) -> Self {
-        inner.to_inner().unwrap()
-    }
-}
-
-impl<F: PRP> From<&Spongos<F>> for Inner<F> {
-    fn from(inner: &Spongos<F>) -> Self {
-        inner.to_inner().unwrap()
+    fn from(s: Spongos<F>) -> Self {
+        s.to_inner()
     }
 }
 
@@ -380,7 +551,7 @@ where
     let mut s = Spongos::<F>::init();
     s.absorb(x);
     s.commit();
-    s.squeeze(y);
+    s.squeeze(y).unwrap();
 }
 
 impl<F: PRP> Digest for Spongos<F>
@@ -406,16 +577,12 @@ where
 
     fn finalize(mut self) -> GenericArray<u8, Self::OutputSize> {
         self.commit();
-        let mut data = GenericArray::default();
-        self.squeeze(data.as_mut_slice());
-        data
+        self.squeeze_arr().unwrap()
     }
 
     fn finalize_reset(&mut self) -> GenericArray<u8, Self::OutputSize> {
         self.commit();
-        let mut data = GenericArray::default();
-        self.squeeze(data.as_mut_slice());
-        data
+        self.squeeze_arr().unwrap()
     }
 
     fn reset(&mut self) {

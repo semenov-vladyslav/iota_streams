@@ -12,17 +12,14 @@ extern crate alloc;
 extern crate std;
 
 /// DDML command traits.
-#[allow(clippy::all)]
 pub mod command;
 
 /// Abstractions for input/output buffers. It does not support the actual IO.
-#[allow(clippy::all)]
 pub mod io;
 
 /// DDML specific types.
-#[allow(clippy::all)]
 pub mod types;
 
 /// LinkStore trait and impls.
-#[allow(clippy::all)]
+#[allow(clippy::type_complexity)]
 pub mod link_store;

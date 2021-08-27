@@ -5,6 +5,9 @@ use crate::types::Size;
 /// Helper trait for unwrapping (decoding/absorbing) uint8s.
 pub(crate) trait Unwrap {
     fn unwrap_u8(&mut self, u: &mut u8) -> Result<&mut Self>;
+    fn unwrap_u8_unchecked_zero(&mut self, u: &mut u8) -> Result<&mut Self> {
+        self.unwrap_u8(u)
+    }
     fn unwrap_u16(&mut self, u: &mut u16) -> Result<&mut Self> {
         let mut v = [0_u8; 2];
         self.unwrapn(&mut v)?;
@@ -25,7 +28,8 @@ pub(crate) trait Unwrap {
     }
     fn unwrap_size(&mut self, size: &mut Size) -> Result<&mut Self> where {
         let mut d = 0_u8;
-        self.unwrap_u8(&mut d)?;
+        // Special case to allow unchecked (ie. without key) decrypt of `0`
+        self.unwrap_u8_unchecked_zero(&mut d)?;
 
         let mut m = 0_usize;
         while 0 < d {

@@ -28,8 +28,10 @@ use iota_streams_app::message::{
 use iota_streams_core::Result;
 
 use iota_streams_app::identifier::Identifier;
-use iota_streams_core::sponge::prp::PRP;
-use iota_streams_core_edsig::signature::ed25519;
+use iota_streams_core::{
+    signature::ed25519,
+    sponge::prp::PRP,
+};
 use iota_streams_ddml::{
     command::*,
     io,
@@ -104,7 +106,7 @@ where
     fn default() -> Self {
         Self {
             link: <<Link as HasLink>::Rel as Default>::default(),
-            id: ed25519::PublicKey::default().into(),
+            id: Identifier::EdPubKey(ed25519::PublicKey::try_from_bytes([0; 32]).unwrap()),
             seq_num: Uint64(0),
             ref_link: <<Link as HasLink>::Rel as Default>::default(),
         }

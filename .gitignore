@@ -3,7 +3,7 @@
 /act
 **/target/
 **/*.rs.bk
-*.lock
+**/*.lock
 *.rs~
 *.toml~
 *.md~

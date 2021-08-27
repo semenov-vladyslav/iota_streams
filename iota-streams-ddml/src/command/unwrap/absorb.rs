@@ -22,13 +22,11 @@ use crate::{
 };
 use iota_streams_core::{
     err,
+    key_exchange::x25519,
+    signature::ed25519,
     sponge::prp::PRP,
     Errors::PublicKeyGenerationFailure,
     Result,
-};
-use iota_streams_core_edsig::{
-    key_exchange::x25519,
-    signature::ed25519,
 };
 
 struct AbsorbContext<F, IS> {
@@ -144,9 +142,9 @@ impl<'a, F: PRP, IS: io::IStream> Absorb<&'a mut Bytes> for Context<F, IS> {
 
 impl<'a, F: PRP, IS: io::IStream> Absorb<&'a mut ed25519::PublicKey> for Context<F, IS> {
     fn absorb(&mut self, pk: &'a mut ed25519::PublicKey) -> Result<&mut Self> {
-        let mut pk_bytes = [0_u8; 32];
+        let mut pk_bytes = [0_u8; ed25519::PUBLIC_KEY_LENGTH];
         unwrap_absorb_bytes(self.as_mut(), &mut pk_bytes)?;
-        match ed25519::PublicKey::from_bytes(&pk_bytes) {
+        match ed25519::PublicKey::try_from_bytes(pk_bytes) {
             Ok(apk) => {
                 *pk = apk;
                 Ok(self)
@@ -160,7 +158,7 @@ impl<'a, F: PRP, IS: io::IStream> Absorb<&'a mut x25519::PublicKey> for Context<
     fn absorb(&mut self, pk: &'a mut x25519::PublicKey) -> Result<&mut Self> {
         let mut pk_bytes = [0_u8; 32];
         unwrap_absorb_bytes(self.as_mut(), &mut pk_bytes)?;
-        *pk = x25519::PublicKey::from(pk_bytes);
+        *pk = x25519::PublicKey::from_bytes(pk_bytes);
         Ok(self)
     }
 }

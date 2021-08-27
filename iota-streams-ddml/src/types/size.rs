@@ -8,7 +8,7 @@ pub struct Size(pub usize);
 pub fn size_bytes(mut n: usize) -> usize {
     let mut d = 0_usize;
     while n > 0 {
-        n = n >> 8;
+        n >>= 8;
         d += 1;
     }
     d

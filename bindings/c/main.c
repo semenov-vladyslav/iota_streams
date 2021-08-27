@@ -6,7 +6,6 @@
 void rand_seed(char *seed, size_t n)
 {
   static char const alphabet[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-=_+";
-  srand((unsigned int)time(NULL));
 
   if (seed && n)
   for(; --n; )
@@ -58,11 +57,13 @@ int main()
   printf("Starting c bindings test\n\n");
   uint8_t multi_branching = 1;
   char seed[] = "bindings test seed";
-  rand_seed(seed, sizeof(seed));
 
 #ifdef IOTA_STREAMS_CHANNELS_CLIENT
   char const *env_url = getenv("URL");
   char const *url = env_url ? env_url : "https://chrysalis-nodes.iota.org";
+
+  srand((unsigned int)time(NULL));
+  rand_seed(seed, sizeof(seed));
 
   printf("Using node: %s\n\n", url);
   tsp = transport_client_new_from_url(url);
@@ -494,6 +495,8 @@ cleanup7:
     if(e) goto cleanup8;
     e = auth_fetch_state(&original_auth_state, auth);
     if(e) goto cleanup8;
+    assert(recovered_auth_state);
+    assert(original_auth_state);
 
     public_key_t const *recovered_auth_pk = NULL;
     e = auth_get_public_key(&recovered_auth_pk, recovered_auth);
@@ -501,9 +504,13 @@ cleanup7:
     public_key_t const *original_auth_pk = NULL;
     e = auth_get_public_key(&original_auth_pk, auth);
     if(e) goto cleanup8;
+    assert(recovered_auth_pk);
+    assert(original_auth_pk);
 
     recovered_state_link = get_link_from_state(recovered_auth_state, recovered_auth_pk);
     original_state_link = get_link_from_state(original_auth_state, original_auth_pk);
+    assert(recovered_state_link);
+    assert(original_state_link);
 
     char const *recovered_link_id = get_address_id_str(recovered_state_link);
     char const *original_link_id = get_address_id_str(original_state_link);
@@ -573,7 +580,6 @@ cleanup10:
   drop_address(reset_sub_state_link);
 
 cleanup:
-  printf("Error code: %d\n", e);
   drop_links(tagged_packet_links);
   drop_links(signed_packet_links);
   drop_links(keyload_links);
@@ -586,6 +592,13 @@ cleanup:
   transport_drop(tsp);
   drop_user_state(original_sub_state);
   drop_address(original_sub_state_link);
+
+  printf("Error code: %d\n", e);
+  if(e != ERR_OK) {
+    char const *err_msg = get_last_error();
+    printf("Failed with error: %s\n", err_msg);
+    drop_str(err_msg);
+  }
 
   return (e == ERR_OK ? 0 : 1);
 }

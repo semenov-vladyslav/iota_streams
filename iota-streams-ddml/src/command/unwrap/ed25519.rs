@@ -1,5 +1,3 @@
-use iota_streams_core::Result;
-
 use super::Context;
 use crate::{
     command::{
@@ -12,32 +10,27 @@ use crate::{
         External,
         HashSig,
         NBytes,
-        Prehashed,
         U64,
     },
 };
 use iota_streams_core::{
+    signature::ed25519,
     sponge::prp::PRP,
-    wrapped_err,
+    try_or,
     Errors::SignatureMismatch,
-    WrappedError,
+    Result,
 };
-use iota_streams_core_edsig::signature::ed25519;
 
 /// Recover public key.
 impl<'a, F: PRP, IS: io::IStream> Ed25519<&'a ed25519::PublicKey, &'a External<NBytes<U64>>> for Context<F, IS> {
     fn ed25519(&mut self, pk: &'a ed25519::PublicKey, hash: &'a External<NBytes<U64>>) -> Result<&mut Self> {
-        let context = "IOTAStreams".as_bytes();
-        let mut prehashed = Prehashed::default();
-        prehashed.0.as_mut_slice().copy_from_slice((hash.0).as_slice());
+        // TODO: ed25519 "IOTAStreams" context
         let mut bytes = [0_u8; ed25519::SIGNATURE_LENGTH];
         let slice = self.stream.try_advance(ed25519::SIGNATURE_LENGTH)?;
         bytes.copy_from_slice(slice);
-        let signature = ed25519::Signature::new(bytes);
-        match pk.verify_prehashed(prehashed, Some(context), &signature) {
-            Ok(()) => Ok(self),
-            Err(e) => Err(wrapped_err!(SignatureMismatch, WrappedError(e))),
-        }
+        let signature = ed25519::Signature::from_bytes(bytes);
+        try_or!(pk.verify(&signature, (hash.0).as_slice()), SignatureMismatch)?;
+        Ok(self)
     }
 }
 

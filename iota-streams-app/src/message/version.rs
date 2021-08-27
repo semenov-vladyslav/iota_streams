@@ -7,7 +7,7 @@
 //! in `Header.content_type` field or the Content Message should implicitly support
 //! versioning (ie. include `content_version` field for example).
 //!
-//! Streams message syntax version is indicated as the first tryte in the trinary encoded message.
+//! Streams message syntax version is indicated as the first byte in the binary encoded message.
 //!
 //! Backwards compatibility of the Streams implementations is welcome and not mandatory.
 

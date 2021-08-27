@@ -18,8 +18,6 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 [workspace]
 members = [
     "iota-streams-core",
-    "iota-streams-core-edsig",
-    "iota-streams-core-keccak",
     "iota-streams-ddml",
     "iota-streams-app",
     "iota-streams-app-channels",
@@ -36,7 +34,7 @@ exclude = [
 [features]
 default = ["std", "tangle", "sync-client"]
 # Enable `std` feature in dependencies
-std = ["iota-streams-core/std", "iota-streams-core-edsig/std", "iota-streams-ddml/std", "iota-streams-app/std", "iota-streams-app-channels/std"]
+std = ["iota-streams-core/std", "iota-streams-ddml/std", "iota-streams-app/std", "iota-streams-app-channels/std"]
 async = ["iota-streams-app/async", "iota-streams-app-channels/async"]
 tangle = ["iota-streams-app/tangle", "iota-streams-app-channels/tangle"]
 sync-client = ["iota-streams-app/sync-client", "iota-streams-app-channels/sync-client"]
@@ -46,8 +44,6 @@ err-location-log = ["iota-streams-core/err-location-log"]
 
 [dependencies]
 iota-streams-core = { version = "0.3.0", path = "iota-streams-core", default-features = false }
-iota-streams-core-keccak = { version = "0.3.0", path = "iota-streams-core-keccak", default-features = false }
-iota-streams-core-edsig = { version = "0.2.0", path = "iota-streams-core-edsig", default-features = false }
 iota-streams-ddml = { version = "0.2.2", path = "iota-streams-ddml", default-features = false }
 iota-streams-app = { version = "1.0.0", path = "iota-streams-app", default-features = false }
 iota-streams-app-channels = { version = "1.0.0", path = "iota-streams-app-channels", default-features = false }

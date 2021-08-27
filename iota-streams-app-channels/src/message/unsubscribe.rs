@@ -5,7 +5,7 @@
 //! message Unsubscribe {
 //!     join link msgid;
 //!     commit;
-//!     squeeze tryte mac[32];
+//!     squeeze u8 mac[16];
 //! }
 //! ```
 //!
@@ -25,10 +25,6 @@ use iota_streams_core::{
         prp::PRP,
         spongos,
     },
-    tbits::{
-        trinary,
-        word::SpongosTbitWord,
-    },
 };
 use iota_streams_ddml::{
     command::*,
@@ -43,7 +39,6 @@ pub struct ContentWrap<'a, TW, F, Link: HasLink> {
 
 impl<'a, TW, F, Link, Store> message::ContentWrap<TW, F, Store> for ContentWrap<'a, TW, F, Link>
 where
-    TW: SpongosTbitWord + trinary::TritWord,
     F: PRP<TW>,
     Link: HasLink,
     <Link as HasLink>::Rel: 'a + Eq + SkipFallback<TW, F>,
@@ -87,7 +82,6 @@ where
 
 impl<TW, F, Link, Store> message::ContentUnwrap<TW, F, Store> for ContentUnwrap<TW, F, Link>
 where
-    TW: SpongosTbitWord + trinary::TritWord,
     F: PRP<TW>,
     Link: HasLink,
     <Link as HasLink>::Rel: Eq + Default + SkipFallback<TW, F>,

@@ -96,6 +96,9 @@ impl<F, Link, Info> LinkStore<F, Link> for EmptyLinkStore<F, Link, Info> {
 pub struct SingleLinkStore<F: PRP, Link, Info>(Link, (Inner<F>, Info));
 
 impl<F: PRP, Link, Info> SingleLinkStore<F, Link, Info> {
+    pub fn new(link: Link, state: (Inner<F>, Info)) -> Self {
+        Self(link, state)
+    }
     pub fn link(&self) -> &Link {
         &self.0
     }
@@ -109,7 +112,7 @@ impl<F: PRP, Link, Info> SingleLinkStore<F, Link, Info> {
 
 impl<F: PRP, Link, Info> LinkStore<F, Link> for SingleLinkStore<F, Link, Info>
 where
-    Link: Clone + Eq + Display,
+    Link: Clone + Eq + ToString,
     Info: Clone,
 {
     type Info = Info;
@@ -169,7 +172,7 @@ where
 
     /// Try to retrieve info for the link.
     fn update(&mut self, link: &Link, spongos: Spongos<F>, info: Info) -> Result<()> {
-        let inner = spongos.to_inner()?;
+        let inner = spongos.to_inner();
         self.map.insert(link.clone(), (inner, info));
         Ok(())
     }

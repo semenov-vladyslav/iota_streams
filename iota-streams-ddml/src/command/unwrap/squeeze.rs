@@ -12,10 +12,10 @@ use iota_streams_core::{
     Errors::BadMac,
 };
 
-/// External values are not encoded. Squeeze and compare tag trits.
+/// External values are not encoded. Squeeze and compare tags.
 impl<'a, F: PRP, IS: io::IStream> Squeeze<&'a Mac> for Context<F, IS> {
     fn squeeze(&mut self, val: &'a Mac) -> Result<&mut Self> {
-        try_or!(self.spongos.squeeze_eq(self.stream.try_advance(val.0)?), BadMac)?;
+        try_or!(self.spongos.squeeze_eq(self.stream.try_advance(val.0)?)?, BadMac)?;
         Ok(self)
     }
 }

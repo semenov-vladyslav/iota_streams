@@ -1,4 +1,4 @@
-//! Lightweight abstraction, a trinary equivalent of `Write` trait allowing access to trinary slices.
+//! Lightweight abstraction, an equivalent of `Write` trait allowing access to slices.
 
 use iota_streams_core::{
     panic_if_not,
@@ -17,14 +17,14 @@ use iota_streams_core::{
 /// Write
 pub trait OStream {
     /// Try advance and panic in case of error.
-    fn advance<'a>(&'a mut self, n: usize) -> &'a mut [u8] {
+    fn advance(&mut self, n: usize) -> &mut [u8] {
         let r = self.try_advance(n);
         panic_if_not(r.is_ok());
         r.unwrap()
     }
 
     /// Try put n tbits into the stream, returning a slice to the buffer.
-    fn try_advance<'a>(&'a mut self, n: usize) -> Result<&'a mut [u8]>;
+    fn try_advance(&mut self, n: usize) -> Result<&mut [u8]>;
 
     /// Commit advanced buffers to the internal sink.
     fn commit(&mut self);
@@ -38,14 +38,14 @@ pub trait OStream {
 /// Read
 pub trait IStream {
     /// Try advance and panic in case of error.
-    fn advance<'a>(&'a mut self, n: usize) -> &'a [u8] {
+    fn advance(&mut self, n: usize) -> &[u8] {
         let r = self.try_advance(n);
         panic_if_not(r.is_ok());
         r.unwrap()
     }
 
     /// Try get n tbits from the stream, returning a slice to the buffer.
-    fn try_advance<'a>(&'a mut self, n: usize) -> Result<&'a [u8]>;
+    fn try_advance(&mut self, n: usize) -> Result<&[u8]>;
 
     /// Commit advanced buffers from the internal sources.
     fn commit(&mut self);
@@ -67,7 +67,7 @@ impl<'b> OStream for &'b mut [u8] {
     }
     fn commit(&mut self) {}
     fn dump(&self) -> String {
-        format!("{}", hex::encode(self))
+        hex::encode(self)
     }
 }
 
@@ -82,6 +82,6 @@ impl<'b> IStream for &'b [u8] {
     }
     fn commit(&mut self) {}
     fn dump(&self) -> String {
-        format!("{}", hex::encode(self))
+        hex::encode(self)
     }
 }

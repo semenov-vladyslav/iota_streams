@@ -1,4 +1,4 @@
-use iota_streams_core::{
+use crate::{
     prelude::{
         generic_array::GenericArray,
         typenum::{

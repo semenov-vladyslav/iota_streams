@@ -1,4 +1,4 @@
-use core::convert::TryInto as _;
+use core::convert::TryInto;
 use wasm_bindgen::prelude::*;
 
 use crate::types::*;

@@ -28,6 +28,8 @@ pub enum Errors {
     PskAlreadyStored,
     /// Input string {0} is not in hex format
     BadHexFormat(String),
+    /// No pre-shared key found associated to a PSK identifier
+    PskNotFound,
 
     //////////
     // Cryptographic
@@ -36,17 +38,25 @@ pub enum Errors {
     KeyConversionFailure,
 
     //////////
+    // Spongos
+    //////////
+    /// Can't squeeze after absorbing data without committing it
+    SpongosInputNotCommitted,
+    /// Can't perform keyed operation without having key committed
+    SpongosKeyNotCommitted,
+
+    //////////
     // DDML Wrap/Unwrap
     //////////
     /// There was an issue with the calculated signature, cannot unwrap message
     SignatureMismatch,
-    /// There was an issue with calculating the signature, cannot wrap message.
+    /// There was an issue with calculating the signature, cannot wrap message
     SignatureFailure,
     /// Failure to generate ed25519 public key
     PublicKeyGenerationFailure,
     /// Failure to generate x25519 public key
     XPublicKeyGenerationFailure,
-    /// Integrity violation. Bad MAC
+    /// Integrity violation, bad MAC
     BadMac,
     /// No default Random Number Generator available for no_std usage
     NoStdRngMissing,
@@ -190,4 +200,6 @@ pub enum Errors {
     InvalidKeySqueeze(String, String),
     /// Subscriber {0} failed to unwrap message, may not have access to branch
     MessageUnwrapFailure(String),
+    /// Test should fail but hasn't
+    TestShouldFail,
 }

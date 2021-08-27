@@ -11,6 +11,7 @@ use crate::{
     types::{
         ArrayLength,
         Bytes,
+        Key,
         NBytes,
         Size,
         Uint16,
@@ -20,14 +21,12 @@ use crate::{
     },
 };
 use iota_streams_core::{
+    key_exchange::x25519,
+    signature::ed25519,
     sponge::prp::PRP,
     wrapped_err,
     Errors::PublicKeyGenerationFailure,
     WrappedError,
-};
-use iota_streams_core_edsig::{
-    key_exchange::x25519,
-    signature::ed25519,
 };
 
 struct MaskContext<F, IS> {
@@ -52,9 +51,17 @@ impl<F: PRP, IS: io::IStream> Unwrap for MaskContext<F, IS> {
         *u = x[0];
         Ok(self)
     }
+    fn unwrap_u8_unchecked_zero(&mut self, u: &mut u8) -> Result<&mut Self> {
+        let y = self.ctx.stream.try_advance(1)?;
+        *u = self.ctx.spongos.decrypt1z(y[0])?;
+        Ok(self)
+    }
     fn unwrapn(&mut self, bytes: &mut [u8]) -> Result<&mut Self> {
         let y = self.ctx.stream.try_advance(bytes.len())?;
-        self.ctx.spongos.decrypt(y, bytes)?;
+        // See corresponding comment in command::wrap::mask.
+        if !bytes.is_empty() {
+            self.ctx.spongos.decrypt(y, bytes)?;
+        }
         Ok(self)
     }
 }
@@ -132,10 +139,17 @@ impl<'a, F: PRP, N: ArrayLength<u8>, IS: io::IStream> Mask<&'a mut NBytes<N>> fo
     }
 }
 
+impl<'a, F: PRP, IS: io::IStream> Mask<&'a mut Key> for Context<F, IS> {
+    fn mask(&mut self, key: &'a mut Key) -> Result<&mut Self> {
+        Ok(unwrap_mask_bytes(self.as_mut(), key.as_mut())?.as_mut())
+    }
+}
+
 impl<'a, F: PRP, IS: io::IStream> Mask<&'a mut Bytes> for Context<F, IS> {
     fn mask(&mut self, bytes: &'a mut Bytes) -> Result<&mut Self> {
         let mut size = Size(0);
         self.mask(&mut size)?;
+        // TODO: Should there be a max size check? Otherwise resize on the next line might eat all memory.
         (bytes.0).resize(size.0, 0);
         Ok(unwrap_mask_bytes(self.as_mut(), &mut (bytes.0)[..])?.as_mut())
     }
@@ -152,9 +166,9 @@ impl<'a, F: PRP, IS: io::IStream> Mask<&'a mut x25519::PublicKey> for Context<F,
 
 impl<'a, F: PRP, IS: io::IStream> Mask<&'a mut ed25519::PublicKey> for Context<F, IS> {
     fn mask(&mut self, pk: &'a mut ed25519::PublicKey) -> Result<&mut Self> {
-        let mut bytes = [0_u8; 32];
+        let mut bytes = [0_u8; ed25519::PUBLIC_KEY_LENGTH];
         unwrap_mask_bytes(self.as_mut(), &mut bytes)?;
-        match ed25519::PublicKey::from_bytes(&bytes[..]) {
+        match ed25519::PublicKey::try_from_bytes(bytes) {
             Ok(apk) => {
                 *pk = apk;
                 Ok(self)

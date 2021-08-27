@@ -21,7 +21,7 @@ pub use iota_streams_core::prelude::{
     },
 };
 
-/// Fixed-size array of bytes, the size is known at compile time and is not encoded in trinary representation.
+/// Fixed-size array of bytes, the size is known at compile time and is not encoded in binary representation.
 #[derive(Clone, PartialEq, Eq, Debug, Default, Hash)]
 pub struct NBytes<N: ArrayLength<u8>>(pub GenericArray<u8, N>);
 
@@ -77,9 +77,9 @@ impl<'a, N: ArrayLength<u8>> From<&'a mut GenericArray<u8, N>> for &'a mut NByte
     }
 }
 
-impl<N: ArrayLength<u8>> Into<GenericArray<u8, N>> for NBytes<N> {
-    fn into(self) -> GenericArray<u8, N> {
-        self.0
+impl<N: ArrayLength<u8>> From<NBytes<N>> for GenericArray<u8, N> {
+    fn from(bs: NBytes<N>) -> Self {
+        bs.0
     }
 }
 

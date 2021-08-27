@@ -5,6 +5,7 @@ use crate::{
     command::{
         wrap::Wrap,
         Absorb,
+        AbsorbKey,
     },
     io,
     types::{
@@ -12,6 +13,7 @@ use crate::{
         ArrayLength,
         External,
         Fallback,
+        Key,
         NBytes,
         Size,
         Uint16,
@@ -21,16 +23,14 @@ use crate::{
     },
 };
 use iota_streams_core::{
+    key_exchange::x25519,
+    signature::ed25519,
     sponge::prp::PRP,
     Result,
 };
-use iota_streams_core_edsig::{
-    key_exchange::x25519,
-    signature::ed25519,
-};
 
 struct AbsorbExternalContext<F, IS> {
-    ctx: Context<F, IS>,
+    pub(crate) ctx: Context<F, IS>,
 }
 impl<F, IS> AsMut<AbsorbExternalContext<F, IS>> for Context<F, IS> {
     fn as_mut<'a>(&'a mut self) -> &'a mut AbsorbExternalContext<F, IS> {
@@ -54,34 +54,34 @@ impl<F: PRP, IS: io::IStream> Wrap for AbsorbExternalContext<F, IS> {
     }
 }
 
-fn wrap_absorb_external_u8<'a, F: PRP, IS: io::IStream>(
-    ctx: &'a mut AbsorbExternalContext<F, IS>,
+fn wrap_absorb_external_u8<F: PRP, IS: io::IStream>(
+    ctx: &mut AbsorbExternalContext<F, IS>,
     u: Uint8,
-) -> Result<&'a mut AbsorbExternalContext<F, IS>> {
+) -> Result<&mut AbsorbExternalContext<F, IS>> {
     ctx.wrap_u8(u.0)
 }
-fn wrap_absorb_external_u16<'a, F: PRP, IS: io::IStream>(
-    ctx: &'a mut AbsorbExternalContext<F, IS>,
+fn wrap_absorb_external_u16<F: PRP, IS: io::IStream>(
+    ctx: &mut AbsorbExternalContext<F, IS>,
     u: Uint16,
-) -> Result<&'a mut AbsorbExternalContext<F, IS>> {
+) -> Result<&mut AbsorbExternalContext<F, IS>> {
     ctx.wrap_u16(u.0)
 }
-fn wrap_absorb_external_u32<'a, F: PRP, IS: io::IStream>(
-    ctx: &'a mut AbsorbExternalContext<F, IS>,
+fn wrap_absorb_external_u32<F: PRP, IS: io::IStream>(
+    ctx: &mut AbsorbExternalContext<F, IS>,
     u: Uint32,
-) -> Result<&'a mut AbsorbExternalContext<F, IS>> {
+) -> Result<&mut AbsorbExternalContext<F, IS>> {
     ctx.wrap_u32(u.0)
 }
-fn wrap_absorb_external_u64<'a, F: PRP, IS: io::IStream>(
-    ctx: &'a mut AbsorbExternalContext<F, IS>,
+fn wrap_absorb_external_u64<F: PRP, IS: io::IStream>(
+    ctx: &mut AbsorbExternalContext<F, IS>,
     u: Uint64,
-) -> Result<&'a mut AbsorbExternalContext<F, IS>> {
+) -> Result<&mut AbsorbExternalContext<F, IS>> {
     ctx.wrap_u64(u.0)
 }
-fn wrap_absorb_external_size<'a, F: PRP, IS: io::IStream>(
-    ctx: &'a mut AbsorbExternalContext<F, IS>,
+fn wrap_absorb_external_size<F: PRP, IS: io::IStream>(
+    ctx: &mut AbsorbExternalContext<F, IS>,
     size: Size,
-) -> Result<&'a mut AbsorbExternalContext<F, IS>> {
+) -> Result<&mut AbsorbExternalContext<F, IS>> {
     ctx.wrap_size(size)
 }
 fn wrap_absorb_external_bytes<'a, F: PRP, IS: io::IStream>(
@@ -89,6 +89,14 @@ fn wrap_absorb_external_bytes<'a, F: PRP, IS: io::IStream>(
     bytes: &[u8],
 ) -> Result<&'a mut AbsorbExternalContext<F, IS>> {
     ctx.wrapn(bytes)
+}
+
+fn wrap_absorb_external_key<'a, F: PRP, IS: io::IStream>(
+    ctx: &'a mut Context<F, IS>,
+    key: &[u8],
+) -> Result<&'a mut Context<F, IS>> {
+    ctx.spongos.absorb_key(key);
+    Ok(ctx)
 }
 
 impl<'a, T: 'a, F: PRP, IS: io::IStream> Absorb<&'a External<T>> for Context<F, IS>
@@ -168,13 +176,13 @@ impl<'a, F: PRP, N: ArrayLength<u8>, IS: io::IStream> Absorb<External<&'a NBytes
 
 impl<'a, F: PRP, IS: io::IStream> Absorb<External<&'a ed25519::PublicKey>> for Context<F, IS> {
     fn absorb(&mut self, pk: External<&'a ed25519::PublicKey>) -> Result<&mut Self> {
-        Ok(wrap_absorb_external_bytes(self.as_mut(), &pk.0.to_bytes()[..])?.as_mut())
+        Ok(wrap_absorb_external_bytes(self.as_mut(), pk.0.as_slice())?.as_mut())
     }
 }
 
 impl<'a, F: PRP, IS: io::IStream> Absorb<External<&'a x25519::PublicKey>> for Context<F, IS> {
     fn absorb(&mut self, pk: External<&'a x25519::PublicKey>) -> Result<&mut Self> {
-        Ok(wrap_absorb_external_bytes(self.as_mut(), &pk.0.as_bytes()[..])?.as_mut())
+        Ok(wrap_absorb_external_bytes(self.as_mut(), pk.0.as_slice())?.as_mut())
     }
 }
 
@@ -182,5 +190,17 @@ impl<'a, F, T: 'a + AbsorbExternalFallback<F>, IS: io::IStream> Absorb<External<
     fn absorb(&mut self, val: External<Fallback<&'a T>>) -> Result<&mut Self> {
         ((val.0).0).unwrap_absorb_external(self)?;
         Ok(self)
+    }
+}
+
+impl<'a, F: PRP, OS: io::IStream> AbsorbKey<External<&'a Key>> for Context<F, OS> {
+    fn absorb_key(&mut self, external_key: External<&'a Key>) -> Result<&mut Self> {
+        wrap_absorb_external_key(self, &external_key.0 .0)
+    }
+}
+
+impl<'a, F: PRP, OS: io::IStream> AbsorbKey<&'a External<Key>> for Context<F, OS> {
+    fn absorb_key(&mut self, external_key: &'a External<Key>) -> Result<&mut Self> {
+        wrap_absorb_external_key(self, &external_key.0 .0)
     }
 }

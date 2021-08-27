@@ -11,7 +11,7 @@ description = "A rust implementation of the IOTA Streams applications"
 [features]
 default = ["std", "tangle", "sync-client"]
 # Enable `std` feature in dependencies
-std = ["iota-streams-core/std", "iota-streams-core-edsig/std", "iota-streams-ddml/std", "chrono/std", "chrono/clock", "hex/std"]
+std = ["iota-streams-core/std", "iota-streams-ddml/std", "chrono/std", "chrono/clock", "hex/std"]
 # rust doesn't support async traits, `async-trait` crate emulates `async` keyword
 # `async` implies `std` for now
 async = ["async-trait", "atomic_refcell"]
@@ -28,7 +28,6 @@ path = "src/lib.rs"
 
 [dependencies]
 iota-streams-core = { version = "0.3.1", path = "../iota-streams-core", default-features = false }
-iota-streams-core-edsig = { version = "0.2.1", path = "../iota-streams-core-edsig", default-features = false }
 iota-streams-ddml = { version = "0.2.1", path = "../iota-streams-ddml", default-features = false }
 
 # anyhow and chrono are kept in sync with versions used in iota-client

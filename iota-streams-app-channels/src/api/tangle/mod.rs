@@ -23,10 +23,10 @@ use iota_streams_app::transport::tangle::client::Details as ClientDetails;
 
 pub use message::Cursor;
 // Bring trait methods into scope publicly.
-pub use message::LinkGenerator as _;
+pub use message::LinkGenerator;
 pub use transport::{
     Transport as _,
-    TransportOptions as _,
+    TransportOptions,
 };
 
 pub use super::ChannelType;
@@ -35,7 +35,7 @@ use iota_streams_core::psk;
 use iota_streams_ddml::link_store::DefaultLinkStore;
 pub use iota_streams_ddml::types::Bytes;
 
-use iota_streams_core_edsig::signature::ed25519;
+use iota_streams_core::signature::ed25519;
 
 /// Identifiers for Pre-Shared Keys
 pub type PskIds = psk::PskIds;

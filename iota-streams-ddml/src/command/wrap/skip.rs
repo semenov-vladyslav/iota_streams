@@ -48,37 +48,22 @@ impl<F, OS: io::OStream> Wrap for SkipContext<F, OS> {
     }
 }
 
-fn wrap_skip_u8<'a, F, OS: io::OStream>(
-    ctx: &'a mut SkipContext<F, OS>,
-    u: Uint8,
-) -> Result<&'a mut SkipContext<F, OS>> {
+fn wrap_skip_u8<F, OS: io::OStream>(ctx: &mut SkipContext<F, OS>, u: Uint8) -> Result<&mut SkipContext<F, OS>> {
     ctx.wrap_u8(u.0)
 }
-fn wrap_skip_u16<'a, F, OS: io::OStream>(
-    ctx: &'a mut SkipContext<F, OS>,
-    u: Uint16,
-) -> Result<&'a mut SkipContext<F, OS>> {
+fn wrap_skip_u16<F, OS: io::OStream>(ctx: &mut SkipContext<F, OS>, u: Uint16) -> Result<&mut SkipContext<F, OS>> {
     ctx.wrap_u16(u.0)
 }
-fn wrap_skip_u32<'a, F, OS: io::OStream>(
-    ctx: &'a mut SkipContext<F, OS>,
-    u: Uint32,
-) -> Result<&'a mut SkipContext<F, OS>> {
+fn wrap_skip_u32<F, OS: io::OStream>(ctx: &mut SkipContext<F, OS>, u: Uint32) -> Result<&mut SkipContext<F, OS>> {
     ctx.wrap_u32(u.0)
 }
-fn wrap_skip_u64<'a, F, OS: io::OStream>(
-    ctx: &'a mut SkipContext<F, OS>,
-    u: Uint64,
-) -> Result<&'a mut SkipContext<F, OS>> {
+fn wrap_skip_u64<F, OS: io::OStream>(ctx: &mut SkipContext<F, OS>, u: Uint64) -> Result<&mut SkipContext<F, OS>> {
     ctx.wrap_u64(u.0)
 }
-fn wrap_skip_size<'a, F, OS: io::OStream>(
-    ctx: &'a mut SkipContext<F, OS>,
-    size: Size,
-) -> Result<&'a mut SkipContext<F, OS>> {
+fn wrap_skip_size<F, OS: io::OStream>(ctx: &mut SkipContext<F, OS>, size: Size) -> Result<&mut SkipContext<F, OS>> {
     ctx.wrap_size(size)
 }
-fn wrap_skip_trits<'a, F, OS: io::OStream>(
+fn wrap_skip_bytes<'a, F, OS: io::OStream>(
     ctx: &'a mut SkipContext<F, OS>,
     bytes: &[u8],
 ) -> Result<&'a mut SkipContext<F, OS>> {
@@ -147,14 +132,14 @@ impl<F, OS: io::OStream> Skip<Size> for Context<F, OS> {
 
 impl<'a, F, N: ArrayLength<u8>, OS: io::OStream> Skip<&'a NBytes<N>> for Context<F, OS> {
     fn skip(&mut self, nbytes: &'a NBytes<N>) -> Result<&mut Self> {
-        Ok(wrap_skip_trits(self.as_mut(), nbytes.as_slice())?.as_mut())
+        Ok(wrap_skip_bytes(self.as_mut(), nbytes.as_slice())?.as_mut())
     }
 }
 
 impl<'a, F, OS: io::OStream> Skip<&'a Bytes> for Context<F, OS> {
     fn skip(&mut self, bytes: &'a Bytes) -> Result<&mut Self> {
         wrap_skip_size(self.as_mut(), Size((bytes.0).len()))?;
-        Ok(wrap_skip_trits(self.as_mut(), &(bytes.0)[..])?.as_mut())
+        Ok(wrap_skip_bytes(self.as_mut(), &(bytes.0)[..])?.as_mut())
     }
 }
 

@@ -3,10 +3,6 @@
 use crate::{
     prelude::{
         generic_array::{
-            typenum::{
-                U16,
-                U32,
-            },
             ArrayLength,
             GenericArray,
         },
@@ -14,82 +10,54 @@ use crate::{
     },
     sponge::{
         prp::PRP,
-        spongos::{
-            self,
-            Spongos,
-        },
+        spongos::Spongos,
+        Key,
+        Nonce,
     },
 };
 
 /// Generate cryptographically secure bytes.
 /// Suitable for generating session and ephemeral keys.
-pub fn random_bytes<R, N: ArrayLength<u8>>(rng: &mut R) -> GenericArray<u8, N>
-where
-    R: rand::RngCore + rand::CryptoRng,
-{
+pub fn random_bytes<N: ArrayLength<u8>>() -> GenericArray<u8, N> {
     let mut rnd = GenericArray::default();
-    rng.fill_bytes(rnd.as_mut_slice());
+    crypto::utils::rand::fill(rnd.as_mut_slice()).unwrap();
     rnd
 }
 
-pub type Nonce = GenericArray<u8, U16>;
-
 /// Generate a random nonce.
-#[cfg(feature = "std")]
 pub fn random_nonce() -> Nonce {
-    random_bytes::<rand::rngs::ThreadRng, U16>(&mut rand::thread_rng())
+    random_bytes()
 }
-
-#[cfg(not(feature = "std"))]
-pub fn random_nonce() -> Nonce {
-    // TODO: Set default global RNG for `no_std` environment.
-    // Use Rng and init with entropy.
-    panic!("No default global RNG present.");
-}
-
-pub type Key = GenericArray<u8, U32>;
 
 /// Generate a random key.
-#[cfg(feature = "std")]
 pub fn random_key() -> Key {
-    random_bytes::<rand::rngs::ThreadRng, U32>(&mut rand::thread_rng())
+    random_bytes()
 }
-
-#[cfg(not(feature = "std"))]
-pub fn random_key() -> Key {
-    // TODO: Set default global RNG for `no_std` environment.
-    // Use Rng and init with entropy.
-    panic!("No default global RNG present.");
-}
-
-/// Prng fixed key size.
-pub type KeySize<F> = spongos::KeySize<F>;
-pub type KeyType<F> = spongos::KeyType<F>;
 
 /// Spongos-based pseudo-random number generator.
 #[derive(Clone)]
 pub struct Prng<G: PRP> {
     /// PRNG secret key.
-    secret_key: KeyType<G>,
+    secret_key: Key,
 
     _phantom: core::marker::PhantomData<G>,
 }
 
 impl<G: PRP> Prng<G> {
     /// Create PRNG instance and init with a secret key.
-    pub fn init(secret_key: KeyType<G>) -> Self {
+    pub fn init(secret_key: Key) -> Self {
         Self {
             secret_key,
             _phantom: core::marker::PhantomData,
         }
     }
 
-    fn key_from_seed(seed: impl AsRef<[u8]>) -> KeyType<G> {
+    fn key_from_seed(seed: impl AsRef<[u8]>) -> Key {
         let mut s = Spongos::<G>::init();
         s.absorb(seed);
         s.commit();
-        let mut secret_key = KeyType::<G>::default();
-        s.squeeze(&mut secret_key);
+        let mut secret_key = Key::default();
+        s.squeeze(&mut secret_key).unwrap();
         secret_key
     }
 
@@ -102,13 +70,13 @@ impl<G: PRP> Prng<G> {
     fn gen_with_spongos<'a>(&self, s: &mut Spongos<G>, nonces: &[&'a [u8]], rnds: &mut [&'a mut [u8]]) {
         // TODO: `dst` byte?
         // TODO: Reimplement PRNG with DDML?
-        s.absorb(&self.secret_key[..]);
+        s.absorb_key(&self.secret_key[..]);
         for nonce in nonces {
             s.absorb(nonce);
         }
         s.commit();
         for rnd in rnds {
-            s.squeeze(rnd);
+            s.squeeze(rnd).unwrap();
         }
     }
 
@@ -132,7 +100,7 @@ impl<G: PRP> Prng<G> {
     }
 }
 
-pub fn init<G: PRP>(secret_key: KeyType<G>) -> Prng<G> {
+pub fn init<G: PRP>(secret_key: Key) -> Prng<G> {
     Prng::init(secret_key)
 }
 
@@ -142,25 +110,20 @@ pub fn from_seed<G: PRP>(domain: &str, seed: &str) -> Prng<G> {
     s.commit();
     s.absorb(domain.as_bytes());
     s.commit();
-    Prng::init(s.squeeze_arr())
+    Prng::init(s.squeeze_arr().unwrap())
 }
 
 pub fn dbg_init_str<G: PRP>(secret_key: &str) -> Prng<G> {
     from_seed("IOTA Streams dbg prng init", secret_key)
 }
 
-/// Rng fixed nonce size.
-pub type NonceSize<F> = spongos::NonceSize<F>;
-// pub type NonceType<F> = spongos::NonceType<F>;
-pub type NonceType = Vec<u8>;
-
 pub struct Rng<G: PRP> {
     prng: Prng<G>,
-    nonce: NonceType,
+    nonce: Nonce,
 }
 
 impl<G: PRP> Rng<G> {
-    pub fn new(prng: Prng<G>, nonce: NonceType) -> Self {
+    pub fn new(prng: Prng<G>, nonce: Nonce) -> Self {
         Self { prng, nonce }
     }
 
@@ -172,7 +135,6 @@ impl<G: PRP> Rng<G> {
                 return true;
             }
         }
-        // self.nonce.push(0);
         false
     }
 }

@@ -2,9 +2,9 @@ use core::fmt;
 
 use iota_streams_core::{
     prelude::Vec,
+    signature::ed25519,
     Result,
 };
-use iota_streams_core_edsig::signature::ed25519;
 
 use super::hdf::HDF;
 use crate::identifier::Identifier;

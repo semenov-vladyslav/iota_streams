@@ -28,6 +28,7 @@ use iota_streams_core::{
         ToString,
         Vec,
     },
+    signature::ed25519,
     sponge::{
         prp::PRP,
         spongos::Spongos,
@@ -36,7 +37,6 @@ use iota_streams_core::{
     Errors::BadHexFormat,
     WrappedError,
 };
-use iota_streams_core_edsig::signature::ed25519;
 use iota_streams_ddml::{
     command::*,
     io,
@@ -66,8 +66,7 @@ pub struct TangleMessage<F> {
     /// Encapsulated binary encoded message.
     pub binary: BinaryMessage<F, TangleAddress>,
 
-    /// Timestamp is not an intrinsic part of Streams message; it's a part of the bundle.
-    /// Timestamp is checked with Kerl as part of bundle essense trits.
+    /// Timestamp is not an intrinsic part of Streams message.
     pub timestamp: u64,
 }
 
@@ -288,7 +287,7 @@ impl<F: PRP> DefaultTangleLinkGenerator<F> {
         s.absorb(&cursor.seq_no.to_be_bytes());
         s.commit();
         let mut new = MsgId::default();
-        s.squeeze(new.id.as_mut());
+        s.squeeze(new.id.as_mut()).unwrap();
         new
     }
     fn gen_msgid(&self, id: &Identifier, cursor: Cursor<&MsgId>) -> MsgId {
@@ -300,7 +299,7 @@ impl<F: PRP> DefaultTangleLinkGenerator<F> {
         s.absorb(&cursor.seq_no.to_be_bytes());
         s.commit();
         let mut new = MsgId::default();
-        s.squeeze(new.id.as_mut());
+        s.squeeze(new.id.as_mut()).unwrap();
         new
     }
 }
@@ -309,7 +308,7 @@ impl<F: PRP> LinkGenerator<TangleAddress> for DefaultTangleLinkGenerator<F> {
     /// Used by Author to generate a new application instance: channels address and announcement message identifier
     fn gen(&mut self, pk: &ed25519::PublicKey, channel_idx: u64) {
         self.addr.appinst = AppInst::new(pk, channel_idx);
-        self.addr.msgid = self.gen_msgid(&Identifier::EdPubKey((*pk).into()), Cursor::default().as_ref());
+        self.addr.msgid = self.gen_msgid(&(*pk).into(), Cursor::default().as_ref());
     }
 
     /// Used by Author to get announcement message id, it's just stored internally by link generator
@@ -352,7 +351,7 @@ pub struct AppInst {
 impl AppInst {
     pub fn new(pk: &ed25519::PublicKey, channel_idx: u64) -> Self {
         let mut id = [0_u8; APPINST_SIZE];
-        id[..32].copy_from_slice(pk.as_bytes());
+        id[..32].copy_from_slice(pk.as_slice());
         id[32..].copy_from_slice(&channel_idx.to_be_bytes());
         Self {
             id: unsafe { core::mem::transmute(id) },

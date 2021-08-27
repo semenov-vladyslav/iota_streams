@@ -3,7 +3,7 @@ use iota_streams_core::Result;
 use super::Context;
 use crate::command::Fork;
 
-/// Forks cost nothing in the trinary stream.
+/// Forks cost nothing in the stream.
 impl<F, C> Fork<C> for Context<F>
 where
     C: for<'a> FnMut(&'a mut Self) -> Result<&'a mut Self>,

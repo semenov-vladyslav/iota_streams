@@ -2,11 +2,11 @@ use core::fmt;
 use iota_streams_core::Result;
 
 use iota_streams_core::{
+    signature::ed25519,
     sponge::prp::PRP,
     try_or,
     Errors::*,
 };
-use iota_streams_core_edsig::signature::ed25519;
 use iota_streams_ddml::{
     command::*,
     io,
@@ -54,7 +54,9 @@ impl<Link: Default> HDF<Link> {
             payload_frame_count: 0,
             previous_msg_link: Bytes::default(),
             seq_num: Uint64(0),
-            sender_id: Identifier::EdPubKey(ed25519::PublicKey::default().into()),
+            sender_id: Identifier::EdPubKey(
+                ed25519::PublicKey::try_from_bytes([0_u8; ed25519::PUBLIC_KEY_LENGTH]).unwrap(),
+            ),
         }
     }
 
@@ -105,7 +107,7 @@ impl<Link: Default> HDF<Link> {
         self
     }
 
-    pub fn get_identifier(&self) -> &Identifier {
+    pub fn to_identifier(&self) -> &Identifier {
         &self.sender_id
     }
 
@@ -155,7 +157,9 @@ impl<Link: Default> Default for HDF<Link> {
             previous_msg_link: Bytes::default(),
             link: Link::default(),
             seq_num: Uint64(0),
-            sender_id: Identifier::EdPubKey(ed25519::PublicKey::default().into()),
+            sender_id: Identifier::EdPubKey(
+                ed25519::PublicKey::try_from_bytes([0_u8; ed25519::PUBLIC_KEY_LENGTH]).unwrap(),
+            ),
         }
     }
 }
@@ -203,7 +207,7 @@ where
 impl<F, Link, Store> ContentWrap<F, Store> for HDF<Link>
 where
     F: PRP,
-    Link: AbsorbExternalFallback<F> + std::fmt::Debug,
+    Link: AbsorbExternalFallback<F> + fmt::Debug,
 {
     fn wrap<'c, OS: io::OStream>(
         &self,
@@ -246,7 +250,7 @@ where
 impl<F, Link, Store> ContentUnwrap<F, Store> for HDF<Link>
 where
     F: PRP,
-    Link: AbsorbExternalFallback<F> + std::fmt::Debug + Clone,
+    Link: AbsorbExternalFallback<F> + fmt::Debug + Clone,
 {
     fn unwrap<'c, IS: io::IStream>(
         &mut self,

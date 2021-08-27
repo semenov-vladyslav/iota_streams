@@ -1,4 +1,4 @@
-use core::convert::TryInto as _;
+use core::convert::TryInto;
 use js_sys::Array;
 use wasm_bindgen::prelude::*;
 

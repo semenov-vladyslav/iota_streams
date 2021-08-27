@@ -201,6 +201,7 @@ extern err_t sub_store_psk(psk_id_t const **pskid, subscriber_t *subscriber, cha
 /// Utility
 /////////////
 extern void drop_str(char const *str);
+extern char const * get_last_error();
 
 extern char const *get_channel_address_str(channel_address_t const *appinst);
 extern char const *get_msgid_str(msgid_t const *msgid);

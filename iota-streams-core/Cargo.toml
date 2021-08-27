@@ -9,7 +9,7 @@ keywords = ["iota", "streams", "core"]
 description = "A rust implementation of the IOTA Streams core utils"
 
 [features]
-default = ["std"]
+default = ["std", "keccak"]
 # enable std
 std = ["rand/std", "digest/std", "hex/std"]
 err-location-log = []
@@ -22,15 +22,16 @@ path = "src/lib.rs"
 # digest version should correspond to curve25519-dalek's version
 digest = { version = "0.9", default-features = false }
 #rand_core = { version = "0.5", default-features = false }
-rand = { version = "0.7", default-features = false, features = ["wasm-bindgen"]}
+rand = { version = "0.8", default-features = false }
 hashbrown = { version = "0.11.2", default-features = false, optional = false, features = ["ahash"] }
 hex = { version = "0.4", default-features = false, optional = false, features = ["alloc"] }
 anyhow = { version = "1.0.34", default-features = false, optional = false }
+keccak = { version = "0.1", optional = true }
 
 # thiserror = { version = "1.0.22", default-features = false, optional = false }
 displaydoc = { version = "0.2", default-features = false, optional = false }
 
-iota-crypto = { git = "https://github.com/iotaledger/crypto.rs", features = ["blake2b"], branch = "dev" }
+iota-crypto = { git = "https://github.com/iotaledger/crypto.rs", branch = "dev", features = ["blake2b", "ed25519", "x25519", "random", "rand", "sha"] }
 
 [dev-dependencies]
 criterion = "0.3"

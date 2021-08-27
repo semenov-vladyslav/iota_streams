@@ -29,17 +29,25 @@ use iota_streams_core::{
 };
 
 /// Absorb command. Trinary representation of the field is absorbed into Spongos state.
-/// External fields are not encoded in the trinary stream. Non-trinary field is
+/// External fields are not encoded in the binary stream. Non-binary field is
 /// an input argument in Wrap command and an output argument in Unwrap command.
 pub trait Absorb<Type> {
     fn absorb(&mut self, field: Type) -> Result<&mut Self>;
 }
 
+pub trait AbsorbKey<Type> {
+    fn absorb_key(&mut self, field: Type) -> Result<&mut Self>;
+}
+
 /// Squeeze command. Trinary representation of the field is squeezed from Spongos state.
-/// The command supports fields of `tryte [n]` type (`NTryte`) and is usually used as
+/// The command supports fields of `byte [n]` type (`NBytes`) and is usually used as
 /// MAC or externally stored hash value to be signed.
 pub trait Squeeze<Type> {
     fn squeeze(&mut self, field: Type) -> Result<&mut Self>;
+}
+
+pub trait SqueezeTag<Type> {
+    fn squeeze_tag(&mut self, field: Type) -> Result<&mut Self>;
 }
 
 /// Mask command. Trinary representation is encrypted in Wrap command and decrypted

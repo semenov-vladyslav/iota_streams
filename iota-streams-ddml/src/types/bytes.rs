@@ -1,14 +1,18 @@
 use core::{
     fmt,
     hash,
+    str::FromStr,
 };
 
-use iota_streams_core::prelude::{
-    hex,
-    Vec,
+use iota_streams_core::{
+    prelude::{
+        hex,
+        Vec,
+    },
+    Error,
 };
 
-/// Variable-size array of bytes, the size is not known at compile time and is encoded in trinary representation.
+/// Variable-size array of bytes, the size is not known at compile time and is encoded in binary representation.
 #[derive(Eq, Clone, Debug, Default)]
 pub struct Bytes(pub Vec<u8>);
 
@@ -33,6 +37,15 @@ impl PartialEq for Bytes {
 impl hash::Hash for Bytes {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         (self.0).hash(state);
+    }
+}
+
+impl FromStr for Bytes {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Self, Error> {
+        let mut v = Vec::new();
+        v.extend_from_slice(s.as_bytes());
+        Ok(Bytes(v))
     }
 }
 

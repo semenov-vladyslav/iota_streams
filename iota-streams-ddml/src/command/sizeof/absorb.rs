@@ -18,7 +18,7 @@ use crate::{
     },
 };
 
-use iota_streams_core_edsig::{
+use iota_streams_core::{
     key_exchange::x25519,
     signature::ed25519,
 };
@@ -144,14 +144,6 @@ impl<'a, F> Absorb<&'a x25519::PublicKey> for Context<F> {
         Ok(self)
     }
 }
-
-// It's the size of the link.
-// impl<'a, F, L: Link> Absorb<&'a L> for Context<F> {
-// fn absorb(&mut self, link: &'a L) -> Result<&mut Self> {
-// self.size += link.len();
-// Ok(self)
-// }
-// }
 
 /// It's the size of the link.
 impl<'a, F, T: 'a + AbsorbFallback<F>> Absorb<&'a Fallback<T>> for Context<F> {

@@ -1,7 +1,7 @@
 use iota_streams_app::{
     identifier::Identifier,
     message::{
-        HasLink as _,
+        HasLink,
         LinkGenerator,
     },
 };
@@ -13,6 +13,7 @@ use iota_streams_core::{
         Psk,
         PskId,
     },
+    sponge::Nonce,
     try_or,
     Errors::{
         ChannelDuplication,
@@ -47,7 +48,8 @@ impl<Trans> User<Trans> {
     /// * `channel_type` - Implementation type: [0: Single Branch, 1: Multi Branch , 2: Single Depth]
     /// * `transport` - Transport object used for sending and receiving
     pub fn new(seed: &str, channel_type: ChannelType, transport: Trans) -> Self {
-        let nonce = "TANGLEUSERNONCE".as_bytes().to_vec();
+        let mut nonce = Nonce::default();
+        nonce.as_mut_slice()[..15].copy_from_slice("TANGLEUSERNONCE".as_bytes());
         let user = UserImp::gen(
             prng::from_seed("IOTA Streams Channels user sig keypair", seed),
             nonce,
@@ -86,7 +88,7 @@ impl<Trans> User<Trans> {
 
     /// Fetch the user ed25519 public key
     pub fn get_public_key(&self) -> &PublicKey {
-        &self.user.sig_kp.public
+        &self.user.sig_kp.1
     }
 
     pub fn is_registered(&self) -> bool {
@@ -275,15 +277,9 @@ impl<Trans: Transport + Clone> User<Trans> {
     ///
     ///  # Arguments
     ///  * `link_to` - Address of the message the keyload will be attached to
-    ///  * `psk_ids` - Vector of Pre-shared key ids to be included in message
-    ///  * `ke_pks`  - Vector of Public Keys to be included in message
-    pub fn send_keyload(
-        &mut self,
-        link_to: &Address,
-        psk_ids: &PskIds,
-        ke_pks: &Vec<&Identifier>,
-    ) -> Result<(Address, Option<Address>)> {
-        let msg = self.user.share_keyload(link_to, psk_ids, ke_pks)?;
+    ///  * `ids` - Array of identifiers to be included in message
+    pub fn send_keyload(&mut self, link_to: &Address, ids: &[Identifier]) -> Result<(Address, Option<Address>)> {
+        let msg = self.user.share_keyload(link_to, ids)?;
         self.send_message_sequenced(msg, link_to.rel(), MsgInfo::Keyload)
     }
 
@@ -609,15 +605,9 @@ impl<Trans: Transport + Clone> User<Trans> {
     ///
     ///  # Arguments
     ///  * `link_to` - Address of the message the keyload will be attached to
-    ///  * `psk_ids` - Vector of Pre-shared key ids to be included in message
-    ///  * `ke_pks`  - Vector of Public Keys to be included in message
-    pub async fn send_keyload(
-        &mut self,
-        link_to: &Address,
-        psk_ids: &PskIds,
-        ke_pks: &Vec<&Identifier>,
-    ) -> Result<(Address, Option<Address>)> {
-        let msg = self.user.share_keyload(link_to, psk_ids, ke_pks)?;
+    ///  * `ids` - array of identifiers to be included in message
+    pub async fn send_keyload(&mut self, link_to: &Address, ids: &[Identifier]) -> Result<(Address, Option<Address>)> {
+        let msg = self.user.share_keyload(link_to, ids)?;
         self.send_message_sequenced(msg, link_to.rel(), MsgInfo::Keyload).await
     }
 

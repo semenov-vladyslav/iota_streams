@@ -33,10 +33,10 @@ use iota_streams_app::message::{
     HasLink,
 };
 use iota_streams_core::{
+    signature::ed25519,
     sponge::prp::PRP,
     Result,
 };
-use iota_streams_core_edsig::signature::ed25519;
 use iota_streams_ddml::{
     command::*,
     io,
@@ -55,7 +55,7 @@ where
     pub(crate) link: &'a <Link as HasLink>::Rel,
     pub(crate) public_payload: &'a Bytes,
     pub(crate) masked_payload: &'a Bytes,
-    pub(crate) sig_kp: &'a ed25519::Keypair,
+    pub(crate) sig_sk: &'a ed25519::SecretKey,
     pub(crate) _phantom: core::marker::PhantomData<(F, Link)>,
 }
 
@@ -68,10 +68,11 @@ where
     fn sizeof<'c>(&self, ctx: &'c mut sizeof::Context<F>) -> Result<&'c mut sizeof::Context<F>> {
         let store = EmptyLinkStore::<F, <Link as HasLink>::Rel, ()>::default();
         ctx.join(&store, self.link)?
-            .absorb(&self.sig_kp.public)?
+            .commit()?
+            .absorb(&self.sig_sk.public_key())?
             .absorb(self.public_payload)?
             .mask(self.masked_payload)?
-            .ed25519(self.sig_kp, HashSig)?;
+            .ed25519(self.sig_sk, HashSig)?;
         // TODO: Is both public and masked payloads are ok? Leave public only or masked only?
         Ok(ctx)
     }
@@ -90,10 +91,11 @@ where
         ctx: &'c mut wrap::Context<F, OS>,
     ) -> Result<&'c mut wrap::Context<F, OS>> {
         ctx.join(store, self.link)?
-            .absorb(&self.sig_kp.public)?
+            .commit()?
+            .absorb(&self.sig_sk.public_key())?
             .absorb(self.public_payload)?
             .mask(self.masked_payload)?
-            .ed25519(self.sig_kp, HashSig)?;
+            .ed25519(self.sig_sk, HashSig)?;
         Ok(ctx)
     }
 }
@@ -116,7 +118,7 @@ where
             link: <<Link as HasLink>::Rel as Default>::default(),
             public_payload: Bytes::default(),
             masked_payload: Bytes::default(),
-            sig_pk: ed25519::PublicKey::default(),
+            sig_pk: ed25519::PublicKey::try_from_bytes([0; 32]).unwrap(),
             _phantom: core::marker::PhantomData,
         }
     }
@@ -135,6 +137,7 @@ where
         ctx: &'c mut unwrap::Context<F, IS>,
     ) -> Result<&'c mut unwrap::Context<F, IS>> {
         ctx.join(store, &mut self.link)?
+            .commit()?
             .absorb(&mut self.sig_pk)?
             .absorb(&mut self.public_payload)?
             .mask(&mut self.masked_payload)?

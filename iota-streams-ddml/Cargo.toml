@@ -11,18 +11,13 @@ description = "A rust implementation of the IOTA Streams DDML"
 [features]
 default = ["std"]
 # enable std
-std = ["rand/std", "iota-streams-core/std", "iota-streams-core-edsig/std"]
+std = ["iota-streams-core/std"]
 
 [lib]
 name = "iota_streams_ddml"
 path = "src/lib.rs"
 
 [dependencies]
-iota-streams-core = { version = "0.3.1", path = "../iota-streams-core", default-features = false }
-iota-streams-core-edsig = { version = "0.2.1", path = "../iota-streams-core-edsig", default-features = false }
+iota-streams-core = { version = "0.3.1", path = "../iota-streams-core", default-features = false, features = ["keccak"] }
 # anyhow version is kept in sync with iota-client
-rand = { version = "0.7", default-features = false }
 hashbrown = { version = "0.8.2", default-features = false, optional = false, features = ["ahash"] }
-
-[dev-dependencies]
-iota-streams-core-keccak = { version = "0.3.1", path = "../iota-streams-core-keccak" }

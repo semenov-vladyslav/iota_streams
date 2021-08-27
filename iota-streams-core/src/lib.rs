@@ -1,7 +1,6 @@
 #![no_std]
 // TODO: Remove this after clippy fixes their false positive bug [https://github.com/rust-lang/rust-clippy/issues/7434]
-#![allow(clippy::nonstandard_macro_braces)]
-//#![feature(generic_associated_types)]
+//#![allow(clippy::nonstandard_macro_braces)]
 
 #[cfg(not(feature = "std"))]
 #[macro_use]
@@ -59,6 +58,12 @@ pub mod prelude;
 pub mod prng;
 pub mod psk;
 pub mod sponge;
+pub mod signature {
+    pub use crypto::signatures::ed25519;
+}
+pub mod key_exchange {
+    pub use crypto::keys::x25519;
+}
 
 pub use errors::{
     error_handler::*,

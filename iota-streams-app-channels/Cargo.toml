@@ -11,7 +11,7 @@ description = "A rust implementation of the IOTA Streams Channels Application"
 [features]
 default = ["std", "tangle", "sync-client"]
 # Enable `std` feature in dependencies
-std = ["iota-streams-core/std", "iota-streams-core-edsig/std", "iota-streams-ddml/std", "iota-streams-app/std", "hex/std"]
+std = ["iota-streams-core/std", "iota-streams-ddml/std", "iota-streams-app/std", "hex/std"]
 async = ["iota-streams-app/async"]
 tangle = ["iota-streams-app/tangle"]
 sync-client = ["iota-streams-app/sync-client", "tangle", "std"]
@@ -23,9 +23,7 @@ name = "iota_streams_app_channels"
 path = "src/lib.rs"
 
 [dependencies]
-iota-streams-core = { version = "0.3.1", path = "../iota-streams-core", default-features = false }
-iota-streams-core-edsig = { version = "0.2.1", path = "../iota-streams-core-edsig", default-features = false }
-iota-streams-core-keccak = { version = "0.3.1", path = "../iota-streams-core-keccak", default-features = false }
+iota-streams-core = { version = "0.3.1", path = "../iota-streams-core", default-features = false, features = ["keccak"] }
 iota-streams-ddml = { version = "0.2.1", path = "../iota-streams-ddml", default-features = false }
 iota-streams-app = { version = "1.0.1", path = "../iota-streams-app", default-features = false }
 

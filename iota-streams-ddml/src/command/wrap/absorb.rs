@@ -21,10 +21,10 @@ use crate::{
         Uint8,
     },
 };
-use iota_streams_core::sponge::prp::PRP;
-use iota_streams_core_edsig::{
+use iota_streams_core::{
     key_exchange::x25519,
     signature::ed25519,
+    sponge::prp::PRP,
 };
 
 struct AbsorbContext<F, OS> {
@@ -55,34 +55,34 @@ impl<F: PRP, OS: io::OStream> Wrap for AbsorbContext<F, OS> {
     }
 }
 
-fn wrap_absorb_u8<'a, F: PRP, OS: io::OStream>(
-    ctx: &'a mut AbsorbContext<F, OS>,
+fn wrap_absorb_u8<F: PRP, OS: io::OStream>(
+    ctx: &mut AbsorbContext<F, OS>,
     u: Uint8,
-) -> Result<&'a mut AbsorbContext<F, OS>> {
+) -> Result<&mut AbsorbContext<F, OS>> {
     ctx.wrap_u8(u.0)
 }
-fn wrap_absorb_u16<'a, F: PRP, OS: io::OStream>(
-    ctx: &'a mut AbsorbContext<F, OS>,
+fn wrap_absorb_u16<F: PRP, OS: io::OStream>(
+    ctx: &mut AbsorbContext<F, OS>,
     u: Uint16,
-) -> Result<&'a mut AbsorbContext<F, OS>> {
+) -> Result<&mut AbsorbContext<F, OS>> {
     ctx.wrap_u16(u.0)
 }
-fn wrap_absorb_u32<'a, F: PRP, OS: io::OStream>(
-    ctx: &'a mut AbsorbContext<F, OS>,
+fn wrap_absorb_u32<F: PRP, OS: io::OStream>(
+    ctx: &mut AbsorbContext<F, OS>,
     u: Uint32,
-) -> Result<&'a mut AbsorbContext<F, OS>> {
+) -> Result<&mut AbsorbContext<F, OS>> {
     ctx.wrap_u32(u.0)
 }
-fn wrap_absorb_u64<'a, F: PRP, OS: io::OStream>(
-    ctx: &'a mut AbsorbContext<F, OS>,
+fn wrap_absorb_u64<F: PRP, OS: io::OStream>(
+    ctx: &mut AbsorbContext<F, OS>,
     u: Uint64,
-) -> Result<&'a mut AbsorbContext<F, OS>> {
+) -> Result<&mut AbsorbContext<F, OS>> {
     ctx.wrap_u64(u.0)
 }
-fn wrap_absorb_size<'a, F: PRP, OS: io::OStream>(
-    ctx: &'a mut AbsorbContext<F, OS>,
+fn wrap_absorb_size<F: PRP, OS: io::OStream>(
+    ctx: &mut AbsorbContext<F, OS>,
     size: Size,
-) -> Result<&'a mut AbsorbContext<F, OS>> {
+) -> Result<&mut AbsorbContext<F, OS>> {
     ctx.wrap_size(size)
 }
 fn wrap_absorb_bytes<'a, F: PRP, OS: io::OStream>(
@@ -173,7 +173,7 @@ impl<'a, F: PRP, OS: io::OStream> Absorb<&'a ed25519::PublicKey> for Context<F, 
 
 impl<'a, F: PRP, OS: io::OStream> Absorb<&'a x25519::PublicKey> for Context<F, OS> {
     fn absorb(&mut self, pk: &'a x25519::PublicKey) -> Result<&mut Self> {
-        Ok(wrap_absorb_bytes(self.as_mut(), &pk.as_bytes()[..])?.as_mut())
+        Ok(wrap_absorb_bytes(self.as_mut(), pk.as_slice())?.as_mut())
     }
 }
 

@@ -76,7 +76,7 @@ pub fn pskid_from_str<F: PRP>(id: &str) -> PskId {
         s.absorb("PSKID");
         s.absorb(id.as_bytes());
         s.commit();
-        s.squeeze_arr()
+        s.squeeze_arr().unwrap()
     }
 }
 
